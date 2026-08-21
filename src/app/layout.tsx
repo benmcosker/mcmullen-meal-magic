@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
 
-import "./globals.css";
+import { Providers } from "@/theme/Providers";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
 export const metadata: Metadata = {
   title: "Meal Magic",
@@ -10,9 +13,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en">
-      <body className="bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
-        {children}
+    <html lang="en" className={geist.variable} suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

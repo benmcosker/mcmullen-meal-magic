@@ -2,12 +2,37 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Feature branches too, not just main: waiting for a pull request to find
+    # out CI is broken wastes a round trip.
+    branches: ["**"]
   pull_request:
 
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    services:
+      # The search tests exercise Postgres-specific behaviour (tsvector
+      # triggers, trigram indexes), so they need a real database rather than
+      # a stand-in.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mealmagic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mealmagic
+      BETTER_AUTH_SECRET: ci-only-secret
+      BETTER_AUTH_URL: http://localhost:3000
 
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +43,7 @@ jobs:
           cache: npm
 
       # postinstall runs `prisma generate`, so the client exists before
-      # typecheck and build need it.
+      # typecheck, tests and build need it.
       - run: npm ci
 
       - run: npm run format:check
@@ -27,8 +52,8 @@ jobs:
 
       - run: npm run typecheck
 
+      - run: npm run db:deploy
+
       - run: npm test
 
       - run: npm run build
-        env:
-          DATABASE_URL: file:./prisma/ci.db

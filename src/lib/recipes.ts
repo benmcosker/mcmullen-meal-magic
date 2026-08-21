@@ -1,0 +1,160 @@
+import { Prisma } from "@/generated/prisma/client";
+
+import { prisma } from "./db";
+
+export type RecipeSearchHit = {
+  id: string;
+  rank: number;
+};
+
+export type RecipeSearchOptions = {
+  /** Free-text query. Empty or whitespace-only returns the newest recipes. */
+  query?: string;
+  /** Tag slugs. A recipe must carry every slug listed to match. */
+  tagSlugs?: string[];
+  limit?: number;
+  offset?: number;
+};
+
+/**
+ * Search recipe IDs, ranked.
+ *
+ * Two matching strategies run together, because either alone leaves obvious
+ * gaps:
+ *
+ * - Full-text against the trigger-maintained `search_vector`. Handles word
+ *   stemming and multi-word queries, and gives us ranking.
+ * - Case-insensitive substring, via the pg_trgm indexes. Full-text alone misses
+ *   partial words and near-misses the English stemmer treats as distinct - a
+ *   search for "lemon" does not match a recipe described as "lemony", because
+ *   those stem to `lemon` and `lemoni`. Substring matching catches it.
+ *
+ * Ingredients and tags live in other tables, so they are matched with EXISTS
+ * subqueries rather than being folded into the recipe's own vector.
+ *
+ * Returned as IDs rather than rows: ranking needs raw SQL, but the caller wants
+ * a fully-hydrated Prisma object, so it re-fetches by ID and re-applies order.
+ */
+export async function searchRecipeIds(
+  options: RecipeSearchOptions = {},
+): Promise<RecipeSearchHit[]> {
+  const query = options.query?.trim() ?? "";
+  const tagSlugs = options.tagSlugs?.filter(Boolean) ?? [];
+  const limit = Math.min(options.limit ?? 50, 200);
+  const offset = Math.max(options.offset ?? 0, 0);
+
+  // Escape LIKE wildcards so a user typing "100%" searches for that literally.
+  const like = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+  const tagFilter =
+    tagSlugs.length > 0
+      ? Prisma.sql`
+          AND (
+            SELECT COUNT(DISTINCT t."slug")
+            FROM "recipe_tag" rt
+            JOIN "tag" t ON t."id" = rt."tagId"
+            WHERE rt."recipeId" = r."id" AND t."slug" IN (${Prisma.join(tagSlugs)})
+          ) = ${tagSlugs.length}
+        `
+      : Prisma.empty;
+
+  if (query === "") {
+    return prisma.$queryRaw<RecipeSearchHit[]>(Prisma.sql`
+      SELECT r."id", 0::float8 AS rank
+      FROM "recipe" r
+      WHERE TRUE ${tagFilter}
+      ORDER BY r."createdAt" DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+  }
+
+  return prisma.$queryRaw<RecipeSearchHit[]>(Prisma.sql`
+    SELECT
+      r."id",
+      ts_rank(r."search_vector", websearch_to_tsquery('english', ${query}))::float8 AS rank
+    FROM "recipe" r
+    WHERE (
+      r."search_vector" @@ websearch_to_tsquery('english', ${query})
+      OR r."title" ILIKE ${like}
+      OR r."description" ILIKE ${like}
+      OR EXISTS (
+        SELECT 1 FROM "ingredient" i
+        WHERE i."recipeId" = r."id"
+          AND (
+            to_tsvector('english', i."name") @@ websearch_to_tsquery('english', ${query})
+            OR i."name" ILIKE ${like}
+          )
+      )
+      OR EXISTS (
+        SELECT 1 FROM "recipe_tag" rt
+        JOIN "tag" t ON t."id" = rt."tagId"
+        WHERE rt."recipeId" = r."id" AND t."name" ILIKE ${like}
+      )
+    )
+    ${tagFilter}
+    ORDER BY rank DESC, r."createdAt" DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+}
+
+const recipeInclude = {
+  ingredients: { orderBy: { position: "asc" } },
+  tags: { include: { tag: true } },
+  createdBy: { select: { id: true, name: true } },
+} satisfies Prisma.RecipeInclude;
+
+export type RecipeWithRelations = Prisma.RecipeGetPayload<{
+  include: typeof recipeInclude;
+}>;
+
+/** Search and hydrate in one call, preserving rank order. */
+export async function searchRecipes(
+  options: RecipeSearchOptions = {},
+): Promise<RecipeWithRelations[]> {
+  const hits = await searchRecipeIds(options);
+  if (hits.length === 0) return [];
+
+  const ids = hits.map((h) => h.id);
+  const recipes = await prisma.recipe.findMany({
+    where: { id: { in: ids } },
+    include: recipeInclude,
+  });
+
+  // `IN (...)` does not preserve order, so restore the ranking from the search.
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((r): r is RecipeWithRelations => r !== undefined);
+}
+
+export async function getRecipe(
+  id: string,
+): Promise<RecipeWithRelations | null> {
+  return prisma.recipe.findUnique({ where: { id }, include: recipeInclude });
+}
+
+/** Turn free-text tag names into Tag rows, reusing any that already exist. */
+export async function upsertTags(names: string[]): Promise<string[]> {
+  const cleaned = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+
+  const tags = await Promise.all(
+    cleaned.map((name) => {
+      const slug = slugifyTag(name);
+      return prisma.tag.upsert({
+        where: { slug },
+        create: { name, slug },
+        update: {},
+      });
+    }),
+  );
+
+  return tags.map((t) => t.id);
+}
+
+export function slugifyTag(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
