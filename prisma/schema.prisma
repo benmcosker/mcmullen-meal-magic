@@ -1,0 +1,86 @@
+// Meal Magic data model.
+//
+// Scaffold status: these models sketch the shape of the app (recipes ->
+// weekly plan -> grocery list) so the database layer is real rather than
+// empty. Nothing reads or writes them yet. Expect to revise before the
+// first feature lands.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  // Strip extensions from generated imports so the Next.js bundler resolves them.
+  importFileExtension = ""
+}
+
+datasource db {
+  // Local dev runs on SQLite. Switching to Postgres is a provider change here
+  // plus a different driver adapter in src/lib/db.ts - see README.
+  provider = "sqlite"
+}
+
+model Recipe {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  servings    Int      @default(4)
+  prepMinutes Int?
+  cookMinutes Int?
+  sourceUrl   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ingredients  Ingredient[]
+  plannedMeals PlannedMeal[]
+
+  @@index([title])
+}
+
+model Ingredient {
+  id       String  @id @default(cuid())
+  recipeId String
+  name     String
+  // Nullable so "salt to taste" is representable without a fake amount.
+  quantity Float?
+  unit     String?
+  note     String?
+  position Int     @default(0)
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+}
+
+model PlannedMeal {
+  id   String   @id @default(cuid())
+  // Midnight UTC on the day the meal is planned for.
+  date DateTime
+  // "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK" - SQLite has no native enums.
+  slot String
+  // Either points at a saved recipe or carries a one-off title ("leftovers").
+  recipeId    String?
+  customTitle String?
+  servings    Int     @default(4)
+  createdAt   DateTime @default(now())
+
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@unique([date, slot])
+  @@index([date])
+}
+
+model GroceryItem {
+  id       String  @id @default(cuid())
+  name     String
+  quantity Float?
+  unit     String?
+  // Produce, dairy, pantry, etc. Free text until aisles are worth modelling.
+  category String?
+  checked  Boolean @default(false)
+  // False for items typed straight onto the list rather than rolled up
+  // from a planned meal's ingredients.
+  fromPlan  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([checked])
+}
