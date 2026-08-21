@@ -1,46 +1,166 @@
-// Meal Magic data model.
-//
-// Scaffold status: these models sketch the shape of the app (recipes ->
-// weekly plan -> grocery list) so the database layer is real rather than
-// empty. Nothing reads or writes them yet. Expect to revise before the
-// first feature lands.
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
   // Strip extensions from generated imports so the Next.js bundler resolves them.
   importFileExtension = ""
 }
 
 datasource db {
-  // Local dev runs on SQLite. Switching to Postgres is a provider change here
-  // plus a different driver adapter in src/lib/db.ts - see README.
-  provider = "sqlite"
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  recipes       Recipe[]
+  invitesSent   Invite[]           @relation("InviteSender")
+  inviteUsed    Invite?            @relation("InviteRedeemer")
+  instacartRuns InstacartHandoff[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// Access control
+// ---------------------------------------------------------------------------
+
+/// Signup is closed. An existing user mints an invite; the recipient redeems
+/// the code to create the only account that code will ever create.
+model Invite {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  /// Optional: pins the invite to one address so a leaked code is still useless.
+  email      String?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  redeemedAt DateTime?
+
+  createdById String
+  createdBy   User   @relation("InviteSender", fields: [createdById], references: [id], onDelete: Cascade)
+
+  /// Set when redeemed. Unique, so one invite can never mint two accounts.
+  redeemedById String? @unique
+  redeemedBy   User?   @relation("InviteRedeemer", fields: [redeemedById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@map("invite")
+}
+
+// ---------------------------------------------------------------------------
+// Recipes
+// ---------------------------------------------------------------------------
+
+/// How a recipe got into the library. Extracted recipes carry their source PDF.
+enum RecipeSource {
+  MANUAL
+  PDF
 }
 
 model Recipe {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  servings    Int      @default(4)
-  prepMinutes Int?
-  cookMinutes Int?
-  sourceUrl   String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  servings     Int          @default(4)
+  prepMinutes  Int?
+  cookMinutes  Int?
+  sourceUrl    String?
+  /// Ordered preparation steps.
+  instructions String[]     @default([])
+  notes        String?
+  source       RecipeSource @default(MANUAL)
+
+  /// Blob URLs. Both optional: the dish photo especially is best-effort, since
+  /// not every PDF contains one.
+  pdfUrl      String?
+  pdfFilename String?
+  imageUrl    String?
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   ingredients  Ingredient[]
+  tags         RecipeTag[]
   plannedMeals PlannedMeal[]
+  groceryItems GroceryItem[]
 
-  @@index([title])
+  /// Maintained by a trigger (see the recipe_search migration), not by Prisma.
+  /// Declared here only so migrations do not drop a column they cannot model.
+  /// Prisma Client cannot select Unsupported columns; search runs as raw SQL.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([searchVector], type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@map("recipe")
 }
 
 model Ingredient {
   id       String  @id @default(cuid())
   recipeId String
   name     String
-  // Nullable so "salt to taste" is representable without a fake amount.
+  /// Nullable so "salt to taste" is representable without inventing an amount.
   quantity Float?
   unit     String?
   note     String?
@@ -49,38 +169,109 @@ model Ingredient {
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@index([recipeId])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@map("ingredient")
 }
 
+model Tag {
+  id        String      @id @default(cuid())
+  /// Display form, e.g. "Sheet Pan".
+  name      String      @unique
+  /// Lookup form, e.g. "sheet-pan".
+  slug      String      @unique
+  createdAt DateTime    @default(now())
+  recipes   RecipeTag[]
+
+  @@map("tag")
+}
+
+model RecipeTag {
+  recipeId String
+  tagId    String
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+  @@index([tagId])
+  @@map("recipe_tag")
+}
+
+// ---------------------------------------------------------------------------
+// Weekly planning
+// ---------------------------------------------------------------------------
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+/// One shared household plan rather than a plan per user - the whole point is
+/// that everyone is looking at the same week.
 model PlannedMeal {
   id   String   @id @default(cuid())
-  // Midnight UTC on the day the meal is planned for.
-  date DateTime
-  // "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK" - SQLite has no native enums.
-  slot String
-  // Either points at a saved recipe or carries a one-off title ("leftovers").
+  /// Midnight UTC on the day the meal is planned for.
+  date DateTime @db.Date
+  slot MealSlot
+
+  /// Either points at a saved recipe or carries a one-off title ("leftovers").
   recipeId    String?
   customTitle String?
-  servings    Int     @default(4)
+  servings    Int      @default(4)
   createdAt   DateTime @default(now())
 
   recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
   @@unique([date, slot])
   @@index([date])
+  @@map("planned_meal")
 }
 
+enum GroceryItemSource {
+  PLAN
+  MANUAL
+}
+
+/// Materialised when a week's list is built, so tick-offs survive a reload and
+/// hand-edits are not clobbered by regenerating.
 model GroceryItem {
-  id       String  @id @default(cuid())
-  name     String
-  quantity Float?
-  unit     String?
-  // Produce, dairy, pantry, etc. Free text until aisles are worth modelling.
-  category String?
-  checked  Boolean @default(false)
-  // False for items typed straight onto the list rather than rolled up
-  // from a planned meal's ingredients.
-  fromPlan  Boolean  @default(false)
+  id        String            @id @default(cuid())
+  /// Monday of the week this line belongs to.
+  weekStart DateTime          @db.Date
+  name      String
+  quantity  Float?
+  unit      String?
+  category  String?
+  checked   Boolean           @default(false)
+  source    GroceryItemSource @default(PLAN)
+
+  /// Which recipe contributed this line, when it came from the plan.
+  recipeId String?
+  recipe   Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
-  @@index([checked])
+  @@index([weekStart, checked])
+  @@index([recipeId])
+  @@map("grocery_item")
+}
+
+/// A record of each cart handed off to Instacart. Instacart returns a URL to a
+/// prepared cart; checkout happens on their side, so this is the last thing we
+/// know about an order.
+model InstacartHandoff {
+  id        String   @id @default(cuid())
+  weekStart DateTime @db.Date
+  url       String
+  itemCount Int
+  createdAt DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([weekStart])
+  @@index([createdById])
+  @@map("instacart_handoff")
 }
