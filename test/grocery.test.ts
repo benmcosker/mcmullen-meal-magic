@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   aggregateIngredients,
+  normaliseName,
   normaliseUnit,
   weekStartOf,
 } from "@/lib/grocery";
@@ -214,5 +215,61 @@ describe("buildShoppingListPayload", () => {
       "t",
     );
     expect(payload.line_items).toEqual([]);
+  });
+});
+
+describe("skipped ingredients", () => {
+  const week = [
+    meal("A", 4, 4, [
+      { name: "butter", quantity: 2, unit: "tbsp" },
+      { name: "chicken breast", quantity: 2, unit: "lb" },
+      { name: "salt", quantity: null, unit: null },
+    ]),
+    meal("B", 4, 4, [{ name: "Butter", quantity: 3, unit: "tbsp" }], "b"),
+  ];
+
+  it("leaves a skipped ingredient off the list entirely", () => {
+    const names = aggregateIngredients(week, new Set(["salt"])).map(
+      (l) => l.name,
+    );
+    expect(names).not.toContain("salt");
+    expect(names).toContain("butter");
+  });
+
+  it("removes an ingredient every recipe contributed, not just one", () => {
+    // Butter comes from both recipes. Skipping after merging would leave a
+    // combined line behind, so the skip has to happen before the merge.
+    const lines = aggregateIngredients(week, new Set(["butter"]));
+    expect(lines.map((l) => l.name)).toEqual(["chicken breast", "salt"]);
+  });
+
+  it("matches regardless of how the ingredient was capitalised", () => {
+    // "Butter" in recipe B must be caught by a skip stored as "butter".
+    const lines = aggregateIngredients(
+      week,
+      new Set([normaliseName("  BUTTER ")]),
+    );
+    expect(lines.map((l) => l.name)).not.toContain("butter");
+  });
+
+  it("changes nothing when the skip list is empty", () => {
+    expect(aggregateIngredients(week, new Set())).toEqual(
+      aggregateIngredients(week),
+    );
+  });
+
+  it("does not skip a different ingredient with a similar name", () => {
+    // "butter" must not take out "butter beans".
+    const lines = aggregateIngredients(
+      [meal("C", 4, 4, [{ name: "butter beans", quantity: 1, unit: "can" }])],
+      new Set(["butter"]),
+    );
+    expect(lines.map((l) => l.name)).toEqual(["butter beans"]);
+  });
+});
+
+describe("normaliseName", () => {
+  it("lower-cases and trims so skips and aggregation agree", () => {
+    expect(normaliseName("  Olive Oil ")).toBe("olive oil");
   });
 });

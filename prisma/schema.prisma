@@ -20,10 +20,11 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  recipes      Recipe[]
-  invitesSent  Invite[]          @relation("InviteSender")
-  inviteUsed   Invite?           @relation("InviteRedeemer")
-  shoppingRuns ShoppingHandoff[]
+  recipes            Recipe[]
+  invitesSent        Invite[]            @relation("InviteSender")
+  inviteUsed         Invite?             @relation("InviteRedeemer")
+  shoppingRuns       ShoppingHandoff[]
+  skippedIngredients SkippedIngredient[]
 
   @@unique([email])
   @@map("user")
@@ -146,7 +147,6 @@ model Recipe {
   ingredients  Ingredient[]
   tags         RecipeTag[]
   plannedMeals PlannedMeal[]
-  groceryItems GroceryItem[]
 
   /// Maintained by a trigger (see the recipe_search migration), not by Prisma.
   /// Declared here only so migrations do not drop a column they cannot model.
@@ -234,33 +234,45 @@ model PlannedMeal {
   @@map("planned_meal")
 }
 
-enum GroceryItemSource {
-  PLAN
-  MANUAL
+/// How long an ingredient stays off the shopping list.
+enum SkipScope {
+  /// Just the week it was skipped in - "we already have milk this week".
+  WEEK
+  /// Every week. Pantry staples: salt, oil, flour. The things that pad a list
+  /// to forty lines and are never actually bought.
+  ALWAYS
 }
 
-/// Materialised when a week's list is built, so tick-offs survive a reload and
-/// hand-edits are not clobbered by regenerating.
-model GroceryItem {
-  id        String            @id @default(cuid())
-  /// Monday of the week this line belongs to.
-  weekStart DateTime          @db.Date
-  name      String
-  quantity  Float?
-  unit      String?
-  category  String?
-  checked   Boolean           @default(false)
-  source    GroceryItemSource @default(PLAN)
+/// An ingredient the household does not want on the shopping list.
+///
+/// Stored as an exclusion rather than materialising the whole list, because
+/// the list is derived from the week's planned meals and changes whenever the
+/// plan does. Materialising it would mean reconciling a regenerated list
+/// against hand edits on every change; an exclusion needs no reconciliation -
+/// it just keeps suppressing a name.
+///
+/// Matching is on `normalisedName`, so "Olive Oil" and "olive oil" are the
+/// same staple.
+model SkippedIngredient {
+  id             String    @id @default(cuid())
+  /// As the household typed or saw it, for display.
+  name           String
+  /// Lower-cased and trimmed, for matching.
+  normalisedName String
+  scope          SkipScope
+  /// Set for WEEK scope, null for ALWAYS.
+  weekStart      DateTime? @db.Date
+  createdAt      DateTime  @default(now())
 
-  /// Which recipe contributed this line, when it came from the plan.
-  recipeId String?
-  recipe   Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-
-  @@index([weekStart, checked])
-  @@index([recipeId])
-  @@map("grocery_item")
+  /// One row per name per week, and one permanent row per name. Postgres treats
+  /// NULLs as distinct in a unique index, so the ALWAYS rows are constrained by
+  /// the partial index in the migration instead.
+  @@unique([normalisedName, weekStart])
+  @@index([createdById])
+  @@map("skipped_ingredient")
 }
 
 /// Where a week's shopping list was sent.
