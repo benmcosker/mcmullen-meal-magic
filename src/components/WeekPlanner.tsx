@@ -24,13 +24,15 @@ import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 
 import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
 
-const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
-const SLOT_LABELS: Record<string, string> = {
-  BREAKFAST: "Breakfast",
-  LUNCH: "Lunch",
-  DINNER: "Dinner",
-  SNACK: "Snack",
-};
+/**
+ * One meal a day.
+ *
+ * It is dinner, and that is what gets stored, but the plan only ever holds one
+ * meal per day so labelling it adds a word without adding information. MealSlot
+ * keeps its other values: the column is there if a second meal is ever wanted,
+ * and unused enum values cost nothing.
+ */
+const MEAL_SLOT: MealSlot = "DINNER";
 const DAY_NAMES = [
   "Monday",
   "Tuesday",
@@ -87,12 +89,12 @@ export function WeekPlanner({
 
   const byKey = new Map(meals.map((m) => [`${m.date}|${m.slot}`, m]));
 
-  function assign(date: string, slot: MealSlot, recipeId: string) {
+  function assign(date: string, recipeId: string) {
     const recipe = recipes.find((r) => r.id === recipeId);
     startTransition(async () => {
       await setPlannedMealAction({
         date,
-        slot,
+        slot: MEAL_SLOT,
         recipeId: recipeId || null,
         servings: recipe?.servings ?? 4,
       });
@@ -147,37 +149,33 @@ export function WeekPlanner({
             <Grid key={date} size={{ xs: 12, sm: 6, md: 12 / 7 }}>
               <Card sx={{ height: "100%" }}>
                 <CardContent sx={{ p: 1.5 }}>
-                  <Typography variant="subtitle2">{day}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {date.slice(5)}
-                  </Typography>
-
-                  <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-                    {SLOTS.map((slot) => {
-                      const meal = byKey.get(`${date}|${slot}`);
-                      return (
-                        <TextField
-                          key={slot}
-                          select
-                          size="small"
-                          label={SLOT_LABELS[slot]}
-                          value={meal?.recipeId ?? ""}
-                          disabled={pending}
-                          onChange={(e) => assign(date, slot, e.target.value)}
-                          fullWidth
-                        >
-                          <MenuItem value="">
-                            <em>Nothing</em>
-                          </MenuItem>
-                          {recipes.map((recipe) => (
-                            <MenuItem key={recipe.id} value={recipe.id}>
-                              {recipe.title}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      );
-                    })}
+                  <Stack
+                    direction="row"
+                    sx={{ alignItems: "baseline", gap: 0.75, mb: 1.25 }}
+                  >
+                    <Typography variant="subtitle2">{day}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {date.slice(5)}
+                    </Typography>
                   </Stack>
+
+                  <TextField
+                    select
+                    size="small"
+                    value={byKey.get(`${date}|${MEAL_SLOT}`)?.recipeId ?? ""}
+                    disabled={pending}
+                    onChange={(e) => assign(date, e.target.value)}
+                    fullWidth
+                  >
+                    <MenuItem value="">
+                      <em>Nothing planned</em>
+                    </MenuItem>
+                    {recipes.map((recipe) => (
+                      <MenuItem key={recipe.id} value={recipe.id}>
+                        {recipe.title}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </CardContent>
               </Card>
             </Grid>
