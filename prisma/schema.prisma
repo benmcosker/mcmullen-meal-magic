@@ -49,6 +49,10 @@ model Account {
   id                    String    @id
   accountId             String
   providerId            String
+  /// Namespaces accountId so a provider ID cannot collide with a local
+  /// credential. Required by better-auth >= 1.5; the deprecated CLI that
+  /// generated these models predates it.
+  issuer                String
   userId                String
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
@@ -62,6 +66,7 @@ model Account {
   updatedAt             DateTime  @updatedAt
 
   @@index([userId])
+  @@index([issuer, accountId])
   @@map("account")
 }
 
