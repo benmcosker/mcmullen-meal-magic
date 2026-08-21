@@ -1,4 +1,6 @@
-import type { GroceryLine } from "./grocery";
+import type { GroceryLine } from "../grocery";
+
+import type { ProviderInfo, ShoppingProviderAdapter } from "./types";
 
 /**
  * Instacart Developer Platform integration.
@@ -70,6 +72,37 @@ export function buildShoppingListPayload(
 export function instacartConfigured(): boolean {
   return Boolean(process.env.INSTACART_API_KEY);
 }
+
+export const instacartProvider: ShoppingProviderAdapter = {
+  info(): ProviderInfo {
+    const available = instacartConfigured();
+    return {
+      id: "INSTACART",
+      label: "Instacart",
+      kind: "cart",
+      description:
+        "Builds a real cart from the whole list. You check out on Instacart.",
+      available,
+      unavailableReason: available
+        ? undefined
+        : "No INSTACART_API_KEY is configured.",
+    };
+  },
+
+  async handoff(lines, weekStart) {
+    if (lines.length === 0) {
+      return { ok: false, error: "There is nothing on the list to send." };
+    }
+
+    const label = weekStart.toISOString().slice(0, 10);
+    const result = await createShoppingListPage(
+      buildShoppingListPayload(lines, `Meal Magic \u2014 week of ${label}`),
+    );
+
+    if (!result.ok) return result;
+    return { ok: true, kind: "cart", url: result.url, itemCount: lines.length };
+  },
+};
 
 /**
  * Create a shopping list page and return its URL.

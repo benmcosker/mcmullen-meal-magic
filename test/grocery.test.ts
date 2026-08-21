@@ -6,7 +6,7 @@ import {
   normaliseUnit,
   weekStartOf,
 } from "@/lib/grocery";
-import { buildShoppingListPayload } from "@/lib/instacart";
+import { buildShoppingListPayload } from "@/lib/shopping/instacart";
 
 function meal(
   title: string,

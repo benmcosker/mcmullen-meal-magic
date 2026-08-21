@@ -9,7 +9,7 @@ import {
   getWeekPlan,
   weekStartOf,
 } from "@/lib/grocery";
-import { instacartConfigured } from "@/lib/instacart";
+import { listProviders } from "@/lib/shopping";
 import { requireUser } from "@/lib/session";
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
@@ -49,7 +49,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
           title: meal.recipe?.title ?? meal.customTitle ?? null,
         }))}
         groceries={groceries}
-        instacartReady={instacartConfigured()}
+        providers={listProviders()}
       />
     </AppShell>
   );

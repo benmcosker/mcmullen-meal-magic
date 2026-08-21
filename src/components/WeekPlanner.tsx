@@ -1,7 +1,6 @@
 "use client";
 
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -16,11 +15,14 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import {
-  sendWeekToInstacartAction,
+  sendWeekToProviderAction,
   setPlannedMealAction,
 } from "@/app/plan/actions";
-import type { MealSlot } from "@/generated/prisma/enums";
+import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import type { GroceryLine } from "@/lib/grocery";
+import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
+
+import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 const SLOT_LABELS: Record<string, string> = {
@@ -68,7 +70,7 @@ export function WeekPlanner({
   recipes,
   meals,
   groceries,
-  instacartReady,
+  providers,
 }: {
   weekStartIso: string;
   prevWeekIso: string;
@@ -76,13 +78,12 @@ export function WeekPlanner({
   recipes: { id: string; title: string; servings: number }[];
   meals: PlannedMeal[];
   groceries: GroceryLine[];
-  instacartReady: boolean;
+  providers: ProviderInfo[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [cartUrl, setCartUrl] = useState<string | null>(null);
-  const [cartError, setCartError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  const [handoff, setHandoff] = useState<HandoffResult | null>(null);
+  const [sendingTo, setSendingTo] = useState<ShoppingProvider | null>(null);
 
   const byKey = new Map(meals.map((m) => [`${m.date}|${m.slot}`, m]));
 
@@ -99,16 +100,12 @@ export function WeekPlanner({
     });
   }
 
-  async function sendToInstacart() {
-    setSending(true);
-    setCartError(null);
-    setCartUrl(null);
+  async function sendTo(providerId: ShoppingProvider) {
+    setSendingTo(providerId);
+    setHandoff(null);
 
-    const result = await sendWeekToInstacartAction(weekStartIso);
-    if (result.ok) setCartUrl(result.url);
-    else setCartError(result.error);
-
-    setSending(false);
+    setHandoff(await sendWeekToProviderAction(weekStartIso, providerId));
+    setSendingTo(null);
   }
 
   return (
@@ -190,49 +187,45 @@ export function WeekPlanner({
 
       <Card>
         <CardContent>
-          <Stack
-            direction="row"
-            sx={{
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: 2,
-              gap: 2,
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography variant="h2">Grocery list</Typography>
-            <Button
-              variant="contained"
-              startIcon={<ShoppingCartIcon />}
-              disabled={sending || groceries.length === 0}
-              onClick={sendToInstacart}
-            >
-              {sending ? "Building cart…" : "Send to Instacart"}
-            </Button>
+          <Typography variant="h2" sx={{ mb: 2 }}>
+            Grocery list
+          </Typography>
+
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mb: 1.5 }}>
+            {providers.map((provider) => (
+              <Button
+                key={provider.id}
+                variant={provider.kind === "cart" ? "contained" : "outlined"}
+                startIcon={<ShoppingCartIcon />}
+                disabled={sendingTo !== null || groceries.length === 0}
+                onClick={() => sendTo(provider.id)}
+              >
+                {sendingTo === provider.id ? "Working\u2026" : provider.label}
+              </Button>
+            ))}
           </Stack>
 
-          {!instacartReady ? (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              No Instacart API key is configured, so sending will fail until one
-              is added. Everything else on this page works.
-            </Alert>
-          ) : null}
+          {/*
+           * Spelled out per provider, because the two kinds behave very
+           * differently and a row of similar buttons would imply otherwise.
+           */}
+          <Stack spacing={0.5} sx={{ mb: 2 }}>
+            {providers.map((provider) => (
+              <Typography
+                key={provider.id}
+                variant="caption"
+                color="text.secondary"
+              >
+                <Box component="span" sx={{ fontWeight: 600 }}>
+                  {provider.label}:
+                </Box>{" "}
+                {provider.description}
+                {provider.available ? "" : ` ${provider.unavailableReason}`}
+              </Typography>
+            ))}
+          </Stack>
 
-          {cartError ? (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {cartError}
-            </Alert>
-          ) : null}
-
-          {cartUrl ? (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Your cart is ready on Instacart.{" "}
-              <a href={cartUrl} target="_blank" rel="noopener noreferrer">
-                Open it to check out
-              </a>
-              . Instacart handles payment and delivery from here.
-            </Alert>
-          ) : null}
+          {handoff ? <ShoppingHandoffPanel result={handoff} /> : null}
 
           {groceries.length === 0 ? (
             <Typography color="text.secondary">

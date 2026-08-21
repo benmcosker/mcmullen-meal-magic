@@ -167,7 +167,7 @@ async function reset() {
   await prisma.ingredient.deleteMany();
   await prisma.groceryItem.deleteMany();
   await prisma.plannedMeal.deleteMany();
-  await prisma.instacartHandoff.deleteMany();
+  await prisma.shoppingHandoff.deleteMany();
   await prisma.recipe.deleteMany();
   await prisma.tag.deleteMany();
   await prisma.invite.deleteMany();
