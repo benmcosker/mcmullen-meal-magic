@@ -47,3 +47,6 @@ next-env.d.ts
 
 # committed env template (the .env* rule above is deliberately broad)
 !.env.example
+
+# local upload driver output
+/public/uploads/
