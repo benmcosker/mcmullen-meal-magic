@@ -2,14 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { aggregateIngredients, getWeekPlan, weekStartOf } from "@/lib/grocery";
-import {
-  buildShoppingListPayload,
-  createShoppingListPage,
-} from "@/lib/instacart";
+import { getProvider, type HandoffResult } from "@/lib/shopping";
 import { requireUser } from "@/lib/session";
-import type { MealSlot } from "@/generated/prisma/enums";
 
 export async function setPlannedMealAction(input: {
   date: string;
@@ -40,12 +37,18 @@ export async function setPlannedMealAction(input: {
   revalidatePath("/plan");
 }
 
-export type SendToInstacartResult =
-  { ok: true; url: string; itemCount: number } | { ok: false; error: string };
-
-export async function sendWeekToInstacartAction(
+/**
+ * Hand this week's list to a shop.
+ *
+ * What comes back depends on the provider: Instacart returns a prepared cart,
+ * Amazon returns per-ingredient search links because it has no ordering API.
+ * The result type keeps those distinct so the UI cannot present one as the
+ * other.
+ */
+export async function sendWeekToProviderAction(
   weekStartIso: string,
-): Promise<SendToInstacartResult> {
+  providerId: ShoppingProvider,
+): Promise<HandoffResult> {
   const user = await requireUser();
 
   const weekStart = weekStartOf(new Date(weekStartIso));
@@ -59,24 +62,21 @@ export async function sendWeekToInstacartAction(
     };
   }
 
-  const label = weekStart.toISOString().slice(0, 10);
-  const result = await createShoppingListPage(
-    buildShoppingListPayload(lines, `Meal Magic — week of ${label}`),
-  );
-
+  const result = await getProvider(providerId).handoff(lines, weekStart);
   if (!result.ok) return result;
 
-  // Record the hand-off. Instacart owns everything after this point, so this
-  // is the last thing we can know about the order.
-  await prisma.instacartHandoff.create({
+  // Record the hand-off. The shop owns everything after this point, so this is
+  // the last thing we can know about an order.
+  await prisma.shoppingHandoff.create({
     data: {
+      provider: providerId,
       weekStart,
-      url: result.url,
+      url: result.kind === "cart" ? result.url : null,
       itemCount: lines.length,
       createdById: user.id,
     },
   });
 
   revalidatePath("/plan");
-  return { ok: true, url: result.url, itemCount: lines.length };
+  return result;
 }

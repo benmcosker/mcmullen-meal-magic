@@ -19,8 +19,9 @@ shopping list to Instacart.
 - **Weekly planner.** Assign recipes to breakfast/lunch/dinner across a week.
 - **Grocery list.** Ingredients roll up across the week's meals, scaled to the
   servings planned and merged where names and units agree.
-- **Instacart hand-off.** Sends the week's list to Instacart and returns a link
-  to a prepared cart.
+- **Shopping hand-off.** Send the week's list to Instacart (a real prepared
+  cart), or to Amazon Fresh / Whole Foods (a search link per ingredient plus a
+  copyable list — see below for why those differ).
 
 ## Stack
 
@@ -99,6 +100,25 @@ means running them against a database you care about will empty it.
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
 integration surface — nothing after the hand-off is visible to this app.
+
+**Amazon cannot build a cart at all.** There is no public Amazon Fresh or Whole
+Foods ordering API; access is granted case by case through a business
+arrangement with Amazon's Fresh team. The add-to-cart URL
+(`/gp/aws/cart/add.html?ASIN.1=…`) still works but needs ASINs, which means the
+Product Advertising API — an Associates account with qualifying sales, and one
+that does not reliably cover Fresh or Whole Foods grocery items. So the Amazon
+providers do the honest thing: a search link per ingredient plus the list as
+plain text. The UI says so rather than implying a basket was filled.
+
+If you later obtain real Fresh API access, `src/lib/shopping/amazon.ts` is the
+only file that needs to change — the provider interface already allows a `cart`
+hand-off, and `ShoppingProvider` already distinguishes the two kinds.
+
+**The Amazon storefront search aliases are unverified.** `i=amazonfresh` and
+`i=wholefoods` scope a search to those storefronts, but amazon.com is blocked
+from the environment this was built in, so the links were never followed. They
+are trivially checkable in a browser: the link either lands in the right store
+or it does not.
 
 **Instacart production access takes time.** Development keys work immediately
 against `connect.dev.instacart.tools`. A production key requires Instacart to

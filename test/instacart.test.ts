@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createShoppingListPage, instacartConfigured } from "@/lib/instacart";
+import {
+  createShoppingListPage,
+  instacartConfigured,
+} from "@/lib/shopping/instacart";
 
 const payload = {
   title: "Week of 2026-08-17",

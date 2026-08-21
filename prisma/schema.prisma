@@ -20,10 +20,10 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  recipes       Recipe[]
-  invitesSent   Invite[]           @relation("InviteSender")
-  inviteUsed    Invite?            @relation("InviteRedeemer")
-  instacartRuns InstacartHandoff[]
+  recipes      Recipe[]
+  invitesSent  Invite[]          @relation("InviteSender")
+  inviteUsed   Invite?           @relation("InviteRedeemer")
+  shoppingRuns ShoppingHandoff[]
 
   @@unique([email])
   @@map("user")
@@ -263,20 +263,33 @@ model GroceryItem {
   @@map("grocery_item")
 }
 
-/// A record of each cart handed off to Instacart. Instacart returns a URL to a
-/// prepared cart; checkout happens on their side, so this is the last thing we
-/// know about an order.
-model InstacartHandoff {
-  id        String   @id @default(cuid())
-  weekStart DateTime @db.Date
-  url       String
+/// Where a week's shopping list was sent.
+///
+/// Only Instacart builds a real cart. Amazon has no public Fresh/Whole Foods
+/// ordering API, so those providers hand over deep links instead - see
+/// src/lib/shopping/amazon.ts.
+enum ShoppingProvider {
+  INSTACART
+  AMAZON_FRESH
+  WHOLE_FOODS
+}
+
+/// A record of each list handed off to a shop. Checkout happens on their side,
+/// so this is the last thing we know about an order.
+model ShoppingHandoff {
+  id        String           @id @default(cuid())
+  provider  ShoppingProvider
+  weekStart DateTime         @db.Date
+  /// The prepared cart, for providers that build one. Null for deep-link
+  /// providers, where there is no single URL representing the whole list.
+  url       String?
   itemCount Int
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([weekStart])
   @@index([createdById])
-  @@map("instacart_handoff")
+  @@map("shopping_handoff")
 }
