@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Feature branches too, not just main: waiting for a pull request to find
+    # out CI is broken wastes a round trip.
+    branches: ["**"]
   pull_request:
 
 jobs:
