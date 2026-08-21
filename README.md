@@ -1,9 +1,26 @@
 # Meal Magic
 
 Recipe box, weekly meal planner and grocery list for the McMullen household.
+Upload a recipe PDF, plan the week from your library, and hand the resulting
+shopping list to Instacart.
 
-> **Status: scaffold.** Tooling, database layer and CI are wired up. No
-> features are built yet — the app renders a single placeholder screen.
+## What works
+
+- **Invite-only accounts.** Signup requires a code minted by an existing user.
+  Every recipe is visible to every signed-in user; the library is shared.
+- **Recipe library.** Create, edit and delete recipes with ingredients, method,
+  servings, timings and tags.
+- **Search.** Full-text plus substring matching across titles, descriptions,
+  method text, ingredients and tags, with tag filters. Search state lives in the
+  URL, so a filtered view is linkable.
+- **PDF upload.** Signed-in users upload a recipe PDF; Claude extracts the
+  fields and the dish photo is pulled out of the PDF, both landing on a review
+  screen before anything is saved.
+- **Weekly planner.** Assign recipes to breakfast/lunch/dinner across a week.
+- **Grocery list.** Ingredients roll up across the week's meals, scaled to the
+  servings planned and merged where names and units agree.
+- **Instacart hand-off.** Sends the week's list to Instacart and returns a link
+  to a prepared cart.
 
 ## Stack
 
@@ -11,66 +28,100 @@ Recipe box, weekly meal planner and grocery list for the McMullen household.
 | --------- | --------------------------------------------- |
 | Framework | Next.js 16 (App Router) + React 19            |
 | Language  | TypeScript                                    |
-| Styling   | Tailwind CSS 4                                |
-| Database  | Prisma 7 → SQLite locally, Postgres-ready     |
-| Tests     | Vitest                                        |
-| Quality   | ESLint + Prettier, enforced in GitHub Actions |
+| UI        | Material UI 9 (emotion), light + dark         |
+| Database  | Postgres via Prisma 7                         |
+| Auth      | Better Auth (email + password, invite-gated)  |
+| Storage   | Vercel Blob, with a local-disk driver for dev |
+| AI        | Claude (`claude-opus-5`) for PDF extraction   |
+| Tests     | Vitest, against a real Postgres               |
 
 ## Getting started
 
 ```bash
-npm install          # postinstall runs `prisma generate`
-cp .env.example .env # sets DATABASE_URL to a local SQLite file
-npm run db:migrate   # creates prisma/dev.db and applies migrations
-npm run dev          # http://localhost:3000
+npm install            # postinstall runs `prisma generate`
+cp .env.example .env   # then fill in the values below
+npm run db:migrate     # creates the schema
+npm run dev            # http://localhost:3000
 ```
+
+You need a Postgres instance. Anything works locally; production is Neon.
+
+### Environment
+
+| Variable                | Needed for            | Notes                                            |
+| ----------------------- | --------------------- | ------------------------------------------------ |
+| `DATABASE_URL`          | everything            | Postgres connection string                       |
+| `BETTER_AUTH_SECRET`    | sessions              | `openssl rand -base64 32`                        |
+| `BETTER_AUTH_URL`       | sessions              | The app's own origin                             |
+| `ANTHROPIC_API_KEY`     | PDF extraction        | Without it, upload returns a clear 422           |
+| `INSTACART_API_KEY`     | sending a cart        | Without it, the planner says so and stays usable |
+| `INSTACART_API_BASE`    | sending a cart        | Dev server by default; switch for production     |
+| `BLOB_READ_WRITE_TOKEN` | uploads in production | Unset locally: files go to `public/uploads/`     |
+
+Missing optional keys degrade gracefully — the rest of the app keeps working
+and the affected feature explains what is missing.
+
+### Creating the first account
+
+Signup is invite-only and there is no bootstrap UI yet, so the first user is
+made by hand:
+
+```sql
+INSERT INTO "user"(id, name, email, "emailVerified", "createdAt", "updatedAt")
+VALUES ('bootstrap', 'Your Name', 'you@example.com', true, now(), now());
+
+INSERT INTO invite(id, code, "expiresAt", "createdAt", "createdById")
+VALUES ('bootstrap-invite', 'PICKSOMETHINGRANDOM', now() + interval '7 days', now(), 'bootstrap');
+```
+
+Then visit `/sign-up?code=PICKSOMETHINGRANDOM`. (Delete the placeholder row
+afterwards if you like — the invite survives on its own.)
 
 ## Scripts
 
-| Script                 | Does                                           |
-| ---------------------- | ---------------------------------------------- |
-| `npm run dev`          | Dev server                                     |
-| `npm run build`        | Production build                               |
-| `npm start`            | Serve the production build                     |
-| `npm test`             | Run the Vitest suite once                      |
-| `npm run test:watch`   | Vitest in watch mode                           |
-| `npm run lint`         | ESLint                                         |
-| `npm run typecheck`    | `tsc --noEmit`                                 |
-| `npm run format`       | Rewrite files with Prettier                    |
-| `npm run format:check` | Fail if anything is unformatted (CI does this) |
-| `npm run db:migrate`   | Create + apply a migration in dev              |
-| `npm run db:deploy`    | Apply existing migrations (deploys)            |
-| `npm run db:studio`    | Prisma Studio GUI                              |
+| Script               | Does                                         |
+| -------------------- | -------------------------------------------- |
+| `npm run dev`        | Dev server                                   |
+| `npm run build`      | Production build                             |
+| `npm test`           | Vitest once (**truncates the dev database**) |
+| `npm run lint`       | ESLint                                       |
+| `npm run typecheck`  | Route types + `tsc --noEmit`                 |
+| `npm run format`     | Prettier                                     |
+| `npm run db:migrate` | Create and apply a migration                 |
+| `npm run db:deploy`  | Apply migrations (production)                |
+| `npm run db:studio`  | Prisma Studio                                |
 
-## Data model
+The integration tests share one database and clean up after themselves, which
+means running them against a database you care about will empty it.
 
-`prisma/schema.prisma` sketches four models — `Recipe`, `Ingredient`,
-`PlannedMeal` and `GroceryItem` — covering the intended flow of recipes into a
-weekly plan and out as a shopping list. They are a starting point, not a
-settled design; nothing reads or writes them yet, so revising them is cheap.
+## Notes and limitations
 
-Prisma 7 notes, since they differ from older tutorials:
+**Instacart does not place orders.** Both of its endpoints return a URL to a
+prepared page; the customer checks out on Instacart. That is the entire
+integration surface — nothing after the hand-off is visible to this app.
 
-- The connection string lives in `prisma.config.ts`, **not** in
-  `schema.prisma`. SQLite paths there resolve relative to that config file.
-- The generator is `prisma-client` (not `prisma-client-js`) and emits
-  TypeScript into `src/generated/prisma`, which is gitignored and rebuilt by
-  `postinstall`.
-- A driver adapter is required. `src/lib/db.ts` uses
-  `@prisma/adapter-better-sqlite3`.
+**Instacart production access takes time.** Development keys work immediately
+against `connect.dev.instacart.tools`. A production key requires Instacart to
+review the integration, which runs to several weeks and needs a registered
+business or US/Canada residency. Worth starting early.
 
-### Moving to Postgres
+**The Instacart request shape is written from documentation, not from a live
+call.** No API key was available while building it, and the docs host is
+unreachable from the build environment, so the request is covered by tests
+against a stubbed transport rather than a real response. Expect to verify field
+names against a development key before trusting it.
 
-Three changes: set `provider = "postgresql"` in `schema.prisma`, swap the
-adapter in `src/lib/db.ts` for `@prisma/adapter-pg` (already published at the
-same version), and point `DATABASE_URL` at the Postgres instance. The schema
-itself is portable, except `PlannedMeal.slot`, which is a `String` because
-SQLite has no native enums — worth promoting to a real enum on Postgres.
+**PDF photo extraction is JPEG-only.** Images stored as DCTDecode streams are
+already complete JPEG files and can be written straight out. Other encodings
+hold raw samples that would need colour-space handling and a PNG encoder.
+Recipe photos are nearly always JPEG; one that is not simply arrives without a
+photo, and can be added by hand.
 
-## Known issues
+**Unit merging is conservative.** Synonyms fold together (`tablespoons` →
+`tbsp`), but nothing converts between units — 1 cup and 200 ml stay as two
+lines. A silently wrong conversion is worse than a slightly longer list.
 
-`npm audit` reports a high-severity advisory in `deepmerge-ts`, pulled in via
-`@prisma/config` under the `prisma` CLI. It is a dev-only dependency and is not
-reachable from application code at runtime. There is no fixed release upstream
-yet; `npm audit fix --force` "resolves" it only by downgrading to Prisma 6,
-which is a breaking change. Worth re-checking when Prisma next publishes.
+**`npm audit` reports a dev-only advisory** in `deepmerge-ts`, reached through
+`@prisma/config` under the Prisma CLI. It is not reachable from application code
+at runtime, and the only "fix" available downgrades to Prisma 6. Worth
+re-checking when Prisma publishes.
