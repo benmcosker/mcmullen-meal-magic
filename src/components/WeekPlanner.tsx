@@ -1,14 +1,14 @@
 "use client";
 
+import AddIcon from "@mui/icons-material/Add";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Grid from "@mui/material/Grid";
-import MenuItem from "@mui/material/MenuItem";
+import CardActionArea from "@mui/material/CardActionArea";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,15 +22,19 @@ import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import type { GroceryLine } from "@/lib/grocery";
 import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 
+import { RecipePickerDialog } from "./RecipePickerDialog";
+import { RecipeTile, type TileRecipe } from "./RecipeTile";
 import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
 
-const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
-const SLOT_LABELS: Record<string, string> = {
-  BREAKFAST: "Breakfast",
-  LUNCH: "Lunch",
-  DINNER: "Dinner",
-  SNACK: "Snack",
-};
+/**
+ * One meal a day.
+ *
+ * It is dinner, and that is what gets stored, but the plan only ever holds one
+ * meal per day so labelling it adds a word without adding information. MealSlot
+ * keeps its other values: the column is there if a second meal is ever wanted,
+ * and unused enum values cost nothing.
+ */
+const MEAL_SLOT: MealSlot = "DINNER";
 const DAY_NAMES = [
   "Monday",
   "Tuesday",
@@ -75,25 +79,28 @@ export function WeekPlanner({
   weekStartIso: string;
   prevWeekIso: string;
   nextWeekIso: string;
-  recipes: { id: string; title: string; servings: number }[];
+  recipes: (TileRecipe & { servings: number })[];
   meals: PlannedMeal[];
   groceries: GroceryLine[];
   providers: ProviderInfo[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [picking, setPicking] = useState<{ date: string; day: string } | null>(
+    null,
+  );
   const [handoff, setHandoff] = useState<HandoffResult | null>(null);
   const [sendingTo, setSendingTo] = useState<ShoppingProvider | null>(null);
 
   const byKey = new Map(meals.map((m) => [`${m.date}|${m.slot}`, m]));
 
-  function assign(date: string, slot: MealSlot, recipeId: string) {
+  function assign(date: string, recipeId: string | null) {
     const recipe = recipes.find((r) => r.id === recipeId);
     startTransition(async () => {
       await setPlannedMealAction({
         date,
-        slot,
-        recipeId: recipeId || null,
+        slot: MEAL_SLOT,
+        recipeId,
         servings: recipe?.servings ?? 4,
       });
       router.refresh();
@@ -143,47 +150,71 @@ export function WeekPlanner({
       <Grid container spacing={2}>
         {DAY_NAMES.map((day, index) => {
           const date = addDaysIso(weekStartIso, index);
+          const plannedId = byKey.get(`${date}|${MEAL_SLOT}`)?.recipeId ?? null;
+          const planned = recipes.find((r) => r.id === plannedId) ?? null;
           return (
-            <Grid key={date} size={{ xs: 12, sm: 6, md: 12 / 7 }}>
+            <Grid key={date} size={{ xs: 6, sm: 4, md: 3, lg: 12 / 7 }}>
               <Card sx={{ height: "100%" }}>
                 <CardContent sx={{ p: 1.5 }}>
-                  <Typography variant="subtitle2">{day}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {date.slice(5)}
-                  </Typography>
-
-                  <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-                    {SLOTS.map((slot) => {
-                      const meal = byKey.get(`${date}|${slot}`);
-                      return (
-                        <TextField
-                          key={slot}
-                          select
-                          size="small"
-                          label={SLOT_LABELS[slot]}
-                          value={meal?.recipeId ?? ""}
-                          disabled={pending}
-                          onChange={(e) => assign(date, slot, e.target.value)}
-                          fullWidth
-                        >
-                          <MenuItem value="">
-                            <em>Nothing</em>
-                          </MenuItem>
-                          {recipes.map((recipe) => (
-                            <MenuItem key={recipe.id} value={recipe.id}>
-                              {recipe.title}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      );
-                    })}
+                  <Stack
+                    direction="row"
+                    sx={{ alignItems: "baseline", gap: 0.75, mb: 1.25 }}
+                  >
+                    <Typography variant="subtitle2">{day}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {date.slice(5)}
+                    </Typography>
                   </Stack>
+
+                  <CardActionArea
+                    onClick={() => setPicking({ date, day })}
+                    disabled={pending}
+                    sx={{ borderRadius: 1.5, p: 0.5 }}
+                  >
+                    {planned ? (
+                      <RecipeTile recipe={planned} />
+                    ) : (
+                      <Box
+                        sx={{
+                          height: 96,
+                          borderRadius: 1,
+                          border: 1,
+                          borderStyle: "dashed",
+                          borderColor: "divider",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "text.disabled",
+                          gap: 0.5,
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                        <Typography variant="caption">Add a meal</Typography>
+                      </Box>
+                    )}
+                  </CardActionArea>
                 </CardContent>
               </Card>
             </Grid>
           );
         })}
       </Grid>
+
+      <RecipePickerDialog
+        open={picking !== null}
+        dayLabel={picking ? `What are we eating on ${picking.day}?` : ""}
+        recipes={recipes}
+        selectedId={
+          picking
+            ? (byKey.get(`${picking.date}|${MEAL_SLOT}`)?.recipeId ?? null)
+            : null
+        }
+        onPick={(recipeId) => {
+          if (picking) assign(picking.date, recipeId);
+        }}
+        onClose={() => setPicking(null)}
+      />
 
       <Card>
         <CardContent>

@@ -1,5 +1,3 @@
-import type { MealSlot } from "@/generated/prisma/enums";
-
 import { prisma } from "./db";
 
 export type GroceryLine = {
@@ -150,9 +148,23 @@ export type PlannedMealWithRecipe = Awaited<
   ReturnType<typeof getWeekPlan>
 >[number];
 
+/**
+ * The single meal planned per day.
+ *
+ * The plan holds one meal a day and it is dinner. Querying that slot
+ * explicitly keeps the grocery list honest: a row in another slot - left by
+ * earlier data, or a future second-meal feature - would otherwise contribute
+ * ingredients to the list while being invisible on the planner, which is a
+ * confusing thing to debug from a shopping list that does not match the week.
+ */
+export const PLANNED_SLOT = "DINNER" as const;
+
 export async function getWeekPlan(weekStart: Date) {
   return prisma.plannedMeal.findMany({
-    where: { date: { gte: weekStart, lt: addDays(weekStart, 7) } },
+    where: {
+      date: { gte: weekStart, lt: addDays(weekStart, 7) },
+      slot: PLANNED_SLOT,
+    },
     include: {
       recipe: {
         include: { ingredients: { orderBy: { position: "asc" } } },
@@ -161,15 +173,3 @@ export async function getWeekPlan(weekStart: Date) {
     orderBy: [{ date: "asc" }, { slot: "asc" }],
   });
 }
-
-export const MEAL_SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"];
-
-export const DAY_NAMES = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
