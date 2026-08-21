@@ -78,6 +78,19 @@ VALUES ('bootstrap-invite', 'PICKSOMETHINGRANDOM', now() + interval '7 days', no
 Then visit `/sign-up?code=PICKSOMETHINGRANDOM`. (Delete the placeholder row
 afterwards if you like — the invite survives on its own.)
 
+## Deploying
+
+See [DEPLOYING.md](./DEPLOYING.md) for the full walkthrough — Neon, Vercel Blob,
+environment variables, and creating the first account.
+
+Two things that bite if skipped: migrations need Neon's **direct** connection
+string (`DIRECT_DATABASE_URL`), not the pooled one, and without a Blob store
+uploads land in `./public/uploads`, which serverless hosting wipes on every
+deploy.
+
+`GET /api/health` reports whether a deploy reached its database and whether the
+schema is present.
+
 ## Scripts
 
 | Script               | Does                                         |
