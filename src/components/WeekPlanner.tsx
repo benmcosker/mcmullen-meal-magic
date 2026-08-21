@@ -19,12 +19,15 @@ import {
   setPlannedMealAction,
 } from "@/app/plan/actions";
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
-import type { GroceryLine } from "@/lib/grocery";
+import type { GroceryLine, SkipRecord } from "@/lib/grocery";
 import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
+
+import { skipIngredientAction } from "@/app/plan/skip-actions";
 
 import { RecipePickerDialog } from "./RecipePickerDialog";
 import { RecipeTile, type TileRecipe } from "./RecipeTile";
 import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
+import { SkippedIngredients } from "./SkippedIngredients";
 
 /**
  * One meal a day.
@@ -74,6 +77,7 @@ export function WeekPlanner({
   recipes,
   meals,
   groceries,
+  skips,
   providers,
 }: {
   weekStartIso: string;
@@ -82,6 +86,7 @@ export function WeekPlanner({
   recipes: (TileRecipe & { servings: number })[];
   meals: PlannedMeal[];
   groceries: GroceryLine[];
+  skips: SkipRecord[];
   providers: ProviderInfo[];
 }) {
   const router = useRouter();
@@ -103,6 +108,13 @@ export function WeekPlanner({
         recipeId,
         servings: recipe?.servings ?? 4,
       });
+      router.refresh();
+    });
+  }
+
+  function skip(name: string, scope: "WEEK" | "ALWAYS") {
+    startTransition(async () => {
+      await skipIngredientAction(name, scope, weekStartIso);
       router.refresh();
     });
   }
@@ -283,20 +295,67 @@ export function WeekPlanner({
               {groceries.map((line) => (
                 <Box
                   key={`${line.name}-${line.unit ?? ""}-${line.quantity ?? "x"}`}
+                  // Stable handle for the row. MUI's generated class names and
+                  // nesting shift between versions, and tests that walk that
+                  // structure silently target the wrong row rather than fail.
+                  data-ingredient={line.name.trim().toLowerCase()}
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 1,
+                    // Controls stay out of the way until the row is
+                    // approached. Forty rows each showing two buttons is
+                    // harder to read than the list being trimmed - but on
+                    // touch there is no hover, so they are always visible
+                    // below md.
+                    "&:hover .row-actions, & .row-actions:focus-within": {
+                      opacity: 1,
+                    },
+                  }}
                 >
-                  <Typography variant="body2">
-                    <Box component="span" sx={{ fontWeight: 600 }}>
-                      {formatAmount(line)}
-                    </Box>{" "}
-                    {line.name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {line.fromRecipes.join(", ")}
-                  </Typography>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2">
+                      <Box component="span" sx={{ fontWeight: 600 }}>
+                        {formatAmount(line)}
+                      </Box>{" "}
+                      {line.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {line.fromRecipes.join(", ")}
+                    </Typography>
+                  </Box>
+
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    className="row-actions"
+                    sx={{
+                      opacity: { xs: 1, md: 0 },
+                      transition: "opacity 120ms",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      disabled={pending}
+                      onClick={() => skip(line.name, "WEEK")}
+                    >
+                      Got it
+                    </Button>
+                    <Button
+                      size="small"
+                      disabled={pending}
+                      onClick={() => skip(line.name, "ALWAYS")}
+                    >
+                      Always have
+                    </Button>
+                  </Stack>
                 </Box>
               ))}
             </Stack>
           )}
+
+          <SkippedIngredients skips={skips} />
         </CardContent>
       </Card>
     </Stack>

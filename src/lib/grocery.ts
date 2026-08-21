@@ -60,7 +60,12 @@ export function normaliseUnit(unit: string | null | undefined): string | null {
   return unitAliases[value] ?? value;
 }
 
-function normaliseName(name: string): string {
+/**
+ * Exported because exclusions have to match names the same way aggregation
+ * groups them. Two different notions of "the same ingredient" would mean
+ * skipping "Olive Oil" and still seeing "olive oil" on the list.
+ */
+export function normaliseName(name: string): string {
   return name.trim().toLowerCase();
 }
 
@@ -89,6 +94,8 @@ export function aggregateIngredients(
       }[];
     } | null;
   }[],
+  /** Normalised names to leave off the list entirely. */
+  skipped: ReadonlySet<string> = new Set(),
 ): GroceryLine[] {
   const merged = new Map<string, GroceryLine>();
 
@@ -103,6 +110,10 @@ export function aggregateIngredients(
       const unit = normaliseUnit(ingredient.unit);
       const name = normaliseName(ingredient.name);
       if (!name) continue;
+
+      // Skipped before merging, so a staple contributed by three recipes
+      // disappears once rather than leaving a merged line behind.
+      if (skipped.has(name)) continue;
 
       const hasQuantity =
         ingredient.quantity != null && ingredient.quantity > 0;
@@ -172,4 +183,35 @@ export async function getWeekPlan(weekStart: Date) {
     },
     orderBy: [{ date: "asc" }, { slot: "asc" }],
   });
+}
+
+export type SkipRecord = {
+  id: string;
+  name: string;
+  normalisedName: string;
+  scope: "WEEK" | "ALWAYS";
+};
+
+/**
+ * Everything hidden from a given week's list: permanent staples, plus anything
+ * skipped for that week specifically.
+ */
+export async function getSkipsForWeek(weekStart: Date): Promise<SkipRecord[]> {
+  const rows = await prisma.skippedIngredient.findMany({
+    where: {
+      OR: [{ scope: "ALWAYS" }, { scope: "WEEK", weekStart }],
+    },
+    orderBy: [{ scope: "asc" }, { name: "asc" }],
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    normalisedName: row.normalisedName,
+    scope: row.scope,
+  }));
+}
+
+export function toSkipSet(skips: SkipRecord[]): Set<string> {
+  return new Set(skips.map((s) => s.normalisedName));
 }

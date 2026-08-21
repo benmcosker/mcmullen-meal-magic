@@ -165,7 +165,7 @@ async function reset() {
   // by default rather than Cascade.
   await prisma.recipeTag.deleteMany();
   await prisma.ingredient.deleteMany();
-  await prisma.groceryItem.deleteMany();
+  await prisma.skippedIngredient.deleteMany();
   await prisma.plannedMeal.deleteMany();
   await prisma.shoppingHandoff.deleteMany();
   await prisma.recipe.deleteMany();

@@ -6,7 +6,9 @@ import { prisma } from "@/lib/db";
 import {
   addDays,
   aggregateIngredients,
+  getSkipsForWeek,
   getWeekPlan,
+  toSkipSet,
   weekStartOf,
 } from "@/lib/grocery";
 import { listProviders } from "@/lib/shopping";
@@ -21,15 +23,16 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     weekParam ? new Date(`${weekParam}T00:00:00.000Z`) : new Date(),
   );
 
-  const [meals, recipes] = await Promise.all([
+  const [meals, recipes, skips] = await Promise.all([
     getWeekPlan(weekStart),
     prisma.recipe.findMany({
       select: { id: true, title: true, servings: true, imageUrl: true },
       orderBy: { title: "asc" },
     }),
+    getSkipsForWeek(weekStart),
   ]);
 
-  const groceries = aggregateIngredients(meals);
+  const groceries = aggregateIngredients(meals, toSkipSet(skips));
 
   return (
     <AppShell>
@@ -49,6 +52,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
           title: meal.recipe?.title ?? meal.customTitle ?? null,
         }))}
         groceries={groceries}
+        skips={skips}
         providers={listProviders()}
       />
     </AppShell>
