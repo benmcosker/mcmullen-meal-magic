@@ -228,7 +228,14 @@ export function WeekPlanner({
                 key={provider.id}
                 variant={provider.kind === "cart" ? "contained" : "outlined"}
                 startIcon={<ShoppingCartIcon />}
-                disabled={sendingTo !== null || groceries.length === 0}
+                // `available` was computed but never used, so a provider
+                // that cannot possibly succeed still invited a click and
+                // answered with an error.
+                disabled={
+                  !provider.available ||
+                  sendingTo !== null ||
+                  groceries.length === 0
+                }
                 onClick={() => sendTo(provider.id)}
               >
                 {sendingTo === provider.id ? "Working\u2026" : provider.label}

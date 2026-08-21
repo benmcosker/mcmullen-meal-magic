@@ -107,19 +107,26 @@ describe("listProviders", () => {
     process.env = { ...originalEnv };
   });
 
-  it("lists all three shops", () => {
+  it("lists the shops that work before the one that cannot", () => {
+    // Instacart builds a real cart and would otherwise lead, but it cannot be
+    // enabled at all right now; listing it first implies the others are a
+    // fallback rather than the only working path.
     expect(listProviders().map((p) => p.id)).toEqual([
-      "INSTACART",
       "AMAZON_FRESH",
       "WHOLE_FOODS",
+      "INSTACART",
     ]);
   });
 
-  it("marks Instacart unavailable without a key, and says why", () => {
+  it("marks Instacart unavailable and explains that no key can be had", () => {
     delete process.env.INSTACART_API_KEY;
     const instacart = listProviders().find((p) => p.id === "INSTACART")!;
     expect(instacart.available).toBe(false);
-    expect(instacart.unavailableReason).toContain("INSTACART_API_KEY");
+    expect(instacart.unavailableReason).toMatch(
+      /closed new developer applications/i,
+    );
+    // Says the integration survives, so nobody assumes it needs rebuilding.
+    expect(instacart.unavailableReason).toMatch(/built/i);
   });
 
   it("marks Instacart available once a key is configured", () => {

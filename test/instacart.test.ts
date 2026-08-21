@@ -24,11 +24,15 @@ describe("createShoppingListPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("reports a clear error when no API key is configured", async () => {
+  it("explains that no key can be obtained, not merely that one is unset", async () => {
     delete process.env.INSTACART_API_KEY;
     const result = await createShoppingListPage(payload);
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.error).toContain("INSTACART_API_KEY");
+    const error = result.ok === false ? result.error : "";
+    // "set INSTACART_API_KEY" would send someone off to find a key that
+    // Instacart is not currently issuing to anyone.
+    expect(error).toMatch(/not accepting new developer applications/i);
+    expect(error).toMatch(/Amazon Fresh or Whole Foods/i);
   });
 
   it("posts to the products_link endpoint with bearer auth and JSON", async () => {

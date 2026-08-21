@@ -10,9 +10,15 @@ import type { ProviderInfo, ShoppingProviderAdapter } from "./types";
  * - It does not place an order. Both endpoints return a URL to a prepared page
  *   on Instacart; the customer completes checkout there. That is the whole of
  *   the integration surface.
- * - Development keys work immediately against connect.dev.instacart.tools.
- *   Production keys require Instacart to review the integration, which takes
- *   weeks - so INSTACART_API_BASE is configuration, not a constant.
+ * - As of August 2026 Instacart is not accepting new developer applications,
+ *   and offers no waitlist. That closes the door on both development and
+ *   production keys, so this provider cannot be switched on today no matter
+ *   how it is configured.
+ *
+ *   The integration is kept rather than deleted: it is written and tested, and
+ *   works the day applications reopen. INSTACART_API_BASE stays configuration
+ *   rather than a constant for the same reason - the dev and production hosts
+ *   differ, and that is a setting, not a code change.
  */
 
 const DEFAULT_BASE = "https://connect.dev.instacart.tools";
@@ -85,7 +91,9 @@ export const instacartProvider: ShoppingProviderAdapter = {
       available,
       unavailableReason: available
         ? undefined
-        : "No INSTACART_API_KEY is configured.",
+        : "Instacart closed new developer applications, with no waitlist, so " +
+          "a key cannot be obtained at present. The integration is built and " +
+          "switches on the moment one exists.",
     };
   },
 
@@ -118,8 +126,9 @@ export async function createShoppingListPage(
     return {
       ok: false,
       error:
-        "INSTACART_API_KEY is not set. Add a development key to enable sending " +
-        "the list to Instacart.",
+        "Instacart is not available: they are not accepting new developer " +
+        "applications, so there is no key to configure yet. Use Amazon Fresh " +
+        "or Whole Foods in the meantime.",
     };
   }
 

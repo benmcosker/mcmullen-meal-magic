@@ -19,9 +19,9 @@ shopping list to Instacart.
 - **Weekly planner.** Assign recipes to breakfast/lunch/dinner across a week.
 - **Grocery list.** Ingredients roll up across the week's meals, scaled to the
   servings planned and merged where names and units agree.
-- **Shopping hand-off.** Send the week's list to Instacart (a real prepared
-  cart), or to Amazon Fresh / Whole Foods (a search link per ingredient plus a
-  copyable list — see below for why those differ).
+- **Shopping hand-off.** Send the week's list to Amazon Fresh or Whole Foods (a
+  search link per ingredient plus a copyable list). An Instacart provider that
+  builds a real cart is written and tested but cannot be enabled — see below.
 
 ## Stack
 
@@ -133,16 +133,22 @@ from the environment this was built in, so the links were never followed. They
 are trivially checkable in a browser: the link either lands in the right store
 or it does not.
 
-**Instacart production access takes time.** Development keys work immediately
-against `connect.dev.instacart.tools`. A production key requires Instacart to
-review the integration, which runs to several weeks and needs a registered
-business or US/Canada residency. Worth starting early.
+**Instacart cannot be switched on at present.** As of August 2026 Instacart is
+not accepting new developer applications and offers no waitlist, which rules out
+development and production keys alike — this is not a lead time to plan around,
+it is a closed door.
+
+The integration is kept rather than removed: it is written and tested, and works
+the day applications reopen. Until then the Instacart button is disabled and says
+why. Amazon Fresh and Whole Foods need no key and no approval, so they are the
+shopping path that works today.
 
 **The Instacart request shape is written from documentation, not from a live
 call.** No API key was available while building it, and the docs host is
 unreachable from the build environment, so the request is covered by tests
-against a stubbed transport rather than a real response. Expect to verify field
-names against a development key before trusting it.
+against a stubbed transport rather than a real response. Since applications are
+closed there is currently no way to verify it against a real response — do that
+before trusting it, whenever a key becomes obtainable.
 
 **PDF photo extraction is JPEG-only.** Images stored as DCTDecode streams are
 already complete JPEG files and can be written straight out. Other encodings
