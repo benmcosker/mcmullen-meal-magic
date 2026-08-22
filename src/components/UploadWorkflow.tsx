@@ -9,12 +9,18 @@ import CardContent from "@mui/material/CardContent";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { saveExtractedRecipeAction } from "@/app/upload/actions";
+import {
+  discardUploadAction,
+  saveExtractedRecipeAction,
+} from "@/app/upload/actions";
 import type { ExtractedRecipe, RecipeInput } from "@/lib/recipe-schema";
 
 import { RecipeForm } from "./RecipeForm";
+
+/** A little beyond the server's own 60s ceiling. */
+const UPLOAD_TIMEOUT_MS = 70_000;
 
 type Extracted = {
   recipe: ExtractedRecipe;
@@ -32,28 +38,64 @@ const confidenceCopy: Record<ExtractedRecipe["confidence"], string> = {
 export function UploadWorkflow() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<Extracted | null>(null);
 
+  // Reading a PDF takes tens of seconds. Without a counter there is no way to
+  // tell a slow extraction from a wedged one, and people re-submit.
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    const timer = setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [busy]);
+
   async function handleFile(file: File) {
     setBusy(true);
+    setElapsed(0);
     setError(null);
 
     const body = new FormData();
     body.append("file", file);
 
+    // Slightly beyond the server's own ceiling, so a server-side timeout
+    // reports its own error rather than being masked by this one. Without any
+    // limit a wedged request spins indefinitely with no way out but a reload.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
     try {
-      const response = await fetch("/api/upload", { method: "POST", body });
-      const payload = await response.json();
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body,
+        signal: controller.signal,
+      });
+
+      // An error page from a proxy or a platform timeout is not JSON, and
+      // parsing it would throw a syntax error that says nothing useful.
+      const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setError(payload.error ?? "Upload failed.");
+        setError(
+          payload?.error ??
+            `Upload failed (${response.status}). The PDF may have taken too long to read.`,
+        );
         return;
       }
+
       setExtracted(payload as Extracted);
-    } catch {
-      setError("Upload failed. Check your connection and try again.");
+    } catch (cause) {
+      setError(
+        cause instanceof DOMException && cause.name === "AbortError"
+          ? "That PDF took too long to read. Try a shorter one, or add the recipe by hand."
+          : "Upload failed. Check your connection and try again.",
+      );
     } finally {
+      clearTimeout(timeout);
       setBusy(false);
     }
   }
@@ -107,7 +149,17 @@ export function UploadWorkflow() {
         />
 
         <Box>
-          <Button onClick={() => setExtracted(null)} disabled={busy}>
+          <Button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              // Remove the stored PDF and photo: nothing will reference them
+              // once this draft is gone.
+              await discardUploadAction(assets);
+              setExtracted(null);
+              setBusy(false);
+            }}
+          >
             Discard and upload a different PDF
           </Button>
         </Box>
@@ -147,7 +199,11 @@ export function UploadWorkflow() {
               disabled={busy}
               onClick={() => inputRef.current?.click()}
             >
-              {busy ? "Reading the PDF…" : "Select PDF"}
+              {busy
+                ? elapsed > 0
+                  ? `Reading the PDF… ${elapsed}s`
+                  : "Reading the PDF…"
+                : "Select PDF"}
             </Button>
 
             {busy ? <LinearProgress sx={{ width: "100%" }} /> : null}

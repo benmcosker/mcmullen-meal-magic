@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 
-import { put } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
 
 /**
  * Where uploaded PDFs and dish photos live.
@@ -42,4 +42,34 @@ export async function storeFile(
   await mkdir(LOCAL_DIR, { recursive: true });
   await writeFile(join(LOCAL_DIR, safeName), Buffer.from(data));
   return { url: `/uploads/${safeName}`, pathname: safeName };
+}
+
+/**
+ * Remove a stored file.
+ *
+ * Used when an extraction is discarded before it is saved. Without this, every
+ * abandoned upload leaves a PDF and a photo behind that nothing will ever
+ * reference - invisible, billable, and impossible to attribute later.
+ *
+ * Failure is swallowed on purpose: a file that is already gone, or a blob store
+ * that is briefly unavailable, must not turn "discard this draft" into an error
+ * the person has to think about.
+ */
+export async function deleteFile(urlOrPathname: string): Promise<void> {
+  if (!urlOrPathname) return;
+
+  try {
+    if (usingBlobStorage()) {
+      await del(urlOrPathname);
+      return;
+    }
+
+    // Local driver: URLs look like /uploads/<name>. Take only the basename, so
+    // a crafted value cannot walk out of the uploads directory.
+    const name = basename(urlOrPathname);
+    if (!name || name === "." || name === "..") return;
+    await unlink(join(LOCAL_DIR, name));
+  } catch {
+    // Nothing actionable: see above.
+  }
 }
