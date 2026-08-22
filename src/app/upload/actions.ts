@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createRecipe } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
 import { requireUser } from "@/lib/session";
+import { deleteFile } from "@/lib/storage";
 
 export type SaveExtractedResult = { ok: false; error: string };
 
@@ -42,4 +43,24 @@ export async function saveExtractedRecipeAction(
 
   revalidatePath("/recipes");
   redirect(`/recipes/${id}`);
+}
+
+/**
+ * Throw away files stored for an extraction the uploader decided against.
+ *
+ * The PDF and photo are stored before the review screen so it has something to
+ * show. If the draft is discarded, nothing will ever reference them again, so
+ * they are removed here rather than left to accumulate silently in the blob
+ * store.
+ */
+export async function discardUploadAction(assets: {
+  pdfUrl?: string | null;
+  imageUrl?: string | null;
+}): Promise<void> {
+  await requireUser();
+
+  await Promise.all([
+    assets.pdfUrl ? deleteFile(assets.pdfUrl) : Promise.resolve(),
+    assets.imageUrl ? deleteFile(assets.imageUrl) : Promise.resolve(),
+  ]);
 }
