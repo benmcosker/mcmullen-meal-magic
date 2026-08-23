@@ -21,6 +21,7 @@ export async function saveExtractedRecipeAction(
   assets: {
     pdfUrl?: string | null;
     pdfFilename?: string | null;
+    pdfSha256?: string | null;
     imageUrl?: string | null;
   },
 ): Promise<SaveExtractedResult> {
@@ -38,6 +39,7 @@ export async function saveExtractedRecipeAction(
     source: "PDF",
     pdfUrl: assets.pdfUrl ?? null,
     pdfFilename: assets.pdfFilename ?? null,
+    pdfSha256: assets.pdfSha256 ?? null,
     imageUrl: assets.imageUrl ?? null,
   });
 
