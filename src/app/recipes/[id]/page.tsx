@@ -13,6 +13,7 @@ import { AppShell } from "@/components/AppShell";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { IconChip } from "@/components/IconChip";
 import { LinkButton } from "@/components/LinkButton";
+import { RecipeImageUploader } from "@/components/RecipeImageUploader";
 import { RecipePlaceholder } from "@/components/RecipePlaceholder";
 import { RecipeReviews } from "@/components/RecipeReviews";
 import { ReviewStars } from "@/components/ReviewStars";
@@ -113,29 +114,41 @@ export default async function RecipePage({
         ) : null}
       </Stack>
 
-      {recipe.imageUrl ? (
-        <Box
-          component="img"
-          src={recipe.imageUrl}
-          alt=""
-          sx={{
-            width: "100%",
-            maxHeight: 380,
-            objectFit: "cover",
-            borderRadius: 2,
-            mb: 3,
-          }}
-        />
-      ) : (
-        <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3 }}>
+        {recipe.imageUrl ? (
+          <Box
+            component="img"
+            src={recipe.imageUrl}
+            alt=""
+            sx={{
+              width: "100%",
+              maxHeight: 380,
+              objectFit: "cover",
+              borderRadius: 2,
+              display: "block",
+            }}
+          />
+        ) : (
           <RecipePlaceholder
             seed={recipe.id}
             title={recipe.title}
             height={{ xs: 160, sm: 220 }}
             showTitle
           />
+        )}
+
+        {/*
+         * Directly under the image it changes, rather than in the edit form.
+         * The moment you want a photo is the moment you are looking at the
+         * placeholder, and a recipe has to exist before it can have one.
+         */}
+        <Box sx={{ mt: 1 }}>
+          <RecipeImageUploader
+            recipeId={recipe.id}
+            hasImage={Boolean(recipe.imageUrl)}
+          />
         </Box>
-      )}
+      </Box>
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 4 }}>

@@ -1,0 +1,65 @@
+import { prisma } from "./db";
+import { deleteFile, storeFile } from "./storage";
+
+/**
+ * Give a recipe its photo, replacing whatever it had.
+ *
+ * One image per recipe, so this is a swap rather than an append. The old file
+ * is removed after the new URL is saved, never before: a failed delete then
+ * leaves an orphaned blob, which is untidy, while the other order would leave
+ * the recipe pointing at a file that no longer exists.
+ */
+export async function setRecipeImage(
+  recipeId: string,
+  bytes: Uint8Array,
+  filename: string,
+  contentType: string,
+): Promise<string> {
+  const existing = await prisma.recipe.findUnique({
+    where: { id: recipeId },
+    select: { imageUrl: true },
+  });
+  if (!existing) throw new Error("No such recipe");
+
+  const stored = await storeFile(bytes, filename, contentType);
+
+  await prisma.recipe.update({
+    where: { id: recipeId },
+    data: { imageUrl: stored.url },
+  });
+
+  await discard(existing.imageUrl, stored.url);
+
+  return stored.url;
+}
+
+/** Take the photo away, leaving the placeholder in its place. */
+export async function clearRecipeImage(recipeId: string): Promise<void> {
+  const existing = await prisma.recipe.findUnique({
+    where: { id: recipeId },
+    select: { imageUrl: true },
+  });
+  if (!existing?.imageUrl) return;
+
+  await prisma.recipe.update({
+    where: { id: recipeId },
+    data: { imageUrl: null },
+  });
+
+  await discard(existing.imageUrl, null);
+}
+
+/**
+ * Remove a file the recipe no longer points at.
+ *
+ * Guarded against deleting the one just written: a PDF-extracted photo and a
+ * re-upload of the same bytes could in principle produce the same URL, and
+ * deleting it would blank the recipe we just set.
+ */
+async function discard(
+  previousUrl: string | null,
+  currentUrl: string | null,
+): Promise<void> {
+  if (!previousUrl || previousUrl === currentUrl) return;
+  await deleteFile(previousUrl);
+}
