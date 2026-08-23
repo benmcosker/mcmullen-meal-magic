@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 
 import { AppShell } from "@/components/AppShell";
+import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { LinkButton } from "@/components/LinkButton";
 import { ReviewStars } from "@/components/ReviewStars";
 import { RecipeSearchBar } from "@/components/RecipeSearchBar";
@@ -73,7 +74,19 @@ export default async function RecipesPage({
         <Grid container spacing={2}>
           {recipes.map((recipe) => (
             <Grid key={recipe.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <Card sx={{ height: "100%" }}>
+              <Card sx={{ height: "100%", position: "relative" }}>
+                {/*
+                 * A sibling of the Link, not a child of it. The whole card is
+                 * a link, and a button inside an anchor is invalid markup
+                 * whose clicks get taken by the navigation.
+                 */}
+                <Box sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
+                  <DeleteRecipeButton
+                    id={recipe.id}
+                    title={recipe.title}
+                    compact
+                  />
+                </Box>
                 <Link
                   href={`/recipes/${recipe.id}`}
                   style={{
