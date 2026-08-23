@@ -21,12 +21,9 @@ import { getRecipe } from "@/lib/recipes";
 import { requireUser } from "@/lib/session";
 
 function formatQuantity(quantity: number | null, unit: string | null): string {
+  // No rounding: String already gives "2" for 2.0 and keeps 0.25 intact.
   if (quantity == null) return unit ?? "";
-  // Trim trailing zeros so 2.00 reads as 2 but 0.25 survives intact.
-  const amount = Number.isInteger(quantity)
-    ? String(quantity)
-    : String(quantity);
-  return unit ? `${amount} ${unit}` : amount;
+  return unit ? `${quantity} ${unit}` : String(quantity);
 }
 
 export default async function RecipePage({

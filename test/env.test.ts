@@ -6,7 +6,6 @@ const full = {
   DATABASE_URL: "postgresql://localhost/db",
   BETTER_AUTH_SECRET: "secret",
   ANTHROPIC_API_KEY: "k",
-  INSTACART_API_KEY: "k",
   BLOB_READ_WRITE_TOKEN: "k",
 };
 
@@ -40,9 +39,26 @@ describe("checkEnv", () => {
     expect(report.missingRequired).toEqual([]);
     expect(report.disabledFeatures.map((f) => f.missing)).toEqual([
       "ANTHROPIC_API_KEY",
-      "INSTACART_API_KEY",
       "BLOB_READ_WRITE_TOKEN",
     ]);
+  });
+
+  it("says nothing about Instacart, however it is configured", () => {
+    // No key can be obtained while Instacart is refusing new developer
+    // applications, so a boot warning would be a permanent alarm about a
+    // closed door - which is how people learn to read past startup warnings.
+    // The provider still works the day a key appears; it just does not
+    // announce its own absence.
+    for (const env of [
+      {},
+      { DATABASE_URL: "x", BETTER_AUTH_SECRET: "y" },
+      { ...full, INSTACART_API_KEY: "" },
+      { ...full, INSTACART_API_KEY: "k" },
+    ]) {
+      expect(
+        checkEnv(env).disabledFeatures.map((f) => f.missing),
+      ).not.toContain("INSTACART_API_KEY");
+    }
   });
 
   it("says what each missing optional key actually costs", () => {

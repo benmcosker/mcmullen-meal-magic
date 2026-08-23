@@ -18,18 +18,19 @@ const REQUIRED = ["DATABASE_URL", "BETTER_AUTH_SECRET"] as const;
  * Without these one feature degrades, and the UI already says so. They are not
  * startup failures: a household with no Anthropic key should still be able to
  * plan meals and type recipes in by hand.
+ *
+ * INSTACART_API_KEY is deliberately absent, and should stay absent. The
+ * provider is complete and switches itself on the day a key exists, but no key
+ * can be obtained while Instacart is refusing new developer applications - so
+ * warning about it on every boot is a permanent alarm about a closed door,
+ * which is how people learn to read past startup warnings. Nothing is
+ * actionable, so nothing is said.
  */
 const OPTIONAL = [
   {
     feature: "PDF recipe extraction",
     missing: "ANTHROPIC_API_KEY",
     consequence: "Uploads return a clear error; recipes can still be typed in.",
-  },
-  {
-    feature: "Instacart carts",
-    missing: "INSTACART_API_KEY",
-    consequence:
-      "The Instacart button reports the missing key. Amazon links still work.",
   },
   {
     feature: "Cloud file storage",
