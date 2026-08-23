@@ -9,6 +9,7 @@ import CardContent from "@mui/material/CardContent";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -22,11 +23,16 @@ import { RecipeForm } from "./RecipeForm";
 /** A little beyond the server's own 60s ceiling. */
 const UPLOAD_TIMEOUT_MS = 70_000;
 
+type ExistingRecipe = { id: string; title: string };
+
 type Extracted = {
   recipe: ExtractedRecipe;
   pdfUrl: string | null;
   pdfFilename: string | null;
+  pdfSha256: string | null;
   imageUrl: string | null;
+  /** Recipes already in the library whose titles look like this one. */
+  similar: ExistingRecipe[];
 };
 
 const confidenceCopy: Record<ExtractedRecipe["confidence"], string> = {
@@ -41,6 +47,7 @@ export function UploadWorkflow() {
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<Extracted | null>(null);
+  const [duplicateOf, setDuplicateOf] = useState<ExistingRecipe | null>(null);
 
   // Reading a PDF takes tens of seconds. Without a counter there is no way to
   // tell a slow extraction from a wedged one, and people re-submit.
@@ -58,6 +65,7 @@ export function UploadWorkflow() {
     setBusy(true);
     setElapsed(0);
     setError(null);
+    setDuplicateOf(null);
 
     const body = new FormData();
     body.append("file", file);
@@ -80,6 +88,9 @@ export function UploadWorkflow() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
+        // 409 carries the recipe it matched, so the message can link to it
+        // instead of leaving someone to search for it.
+        if (payload?.duplicateOf) setDuplicateOf(payload.duplicateOf);
         setError(
           payload?.error ??
             `Upload failed (${response.status}). The PDF may have taken too long to read.`,
@@ -120,6 +131,21 @@ export function UploadWorkflow() {
         <Alert severity={recipe.confidence === "low" ? "warning" : "info"}>
           {confidenceCopy[recipe.confidence]}
         </Alert>
+
+        {extracted.similar.length > 0 ? (
+          <Alert severity="warning">
+            The library already has{" "}
+            {extracted.similar.map((match, index) => (
+              <span key={match.id}>
+                {index > 0 ? ", " : ""}
+                <Link href={`/recipes/${match.id}`}>{match.title}</Link>
+              </span>
+            ))}
+            . This is a different file, so it may be a better copy of the same
+            dish — or a different recipe that happens to share a name. Saving
+            adds it alongside.
+          </Alert>
+        ) : null}
 
         {assets.imageUrl ? (
           <Box
@@ -169,7 +195,18 @@ export function UploadWorkflow() {
 
   return (
     <Stack spacing={2}>
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {error ? (
+        <Alert severity={duplicateOf ? "info" : "error"}>
+          {error}
+          {duplicateOf ? (
+            <>
+              {" "}
+              <Link href={`/recipes/${duplicateOf.id}`}>Open it</Link>, or pick
+              a different PDF.
+            </>
+          ) : null}
+        </Alert>
+      ) : null}
 
       <Card>
         <CardContent>

@@ -136,6 +136,11 @@ model Recipe {
   /// not every PDF contains one.
   pdfUrl      String?
   pdfFilename String?
+  /// SHA-256 of the uploaded PDF's bytes, so the same file is recognised on a
+  /// second upload. Unique, and null for recipes typed in by hand - Postgres
+  /// treats NULLs as distinct, so any number of manual recipes coexist while
+  /// one PDF can only ever produce one recipe.
+  pdfSha256   String? @unique
   imageUrl    String?
 
   createdById String

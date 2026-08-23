@@ -10,6 +10,8 @@ function emptyToNull(value: string | null | undefined): string | null {
 type RecipeAssets = {
   pdfUrl?: string | null;
   pdfFilename?: string | null;
+  /** Lets a re-upload of the same file be recognised. Null for manual entry. */
+  pdfSha256?: string | null;
   imageUrl?: string | null;
   source?: "MANUAL" | "PDF";
 };
@@ -34,6 +36,7 @@ export async function createRecipe(
       source: assets.source ?? "MANUAL",
       pdfUrl: assets.pdfUrl ?? null,
       pdfFilename: assets.pdfFilename ?? null,
+      pdfSha256: assets.pdfSha256 ?? null,
       imageUrl: assets.imageUrl ?? null,
       createdById,
       ingredients: {
