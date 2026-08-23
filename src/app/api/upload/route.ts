@@ -9,7 +9,7 @@ import {
 import { extractRecipeFromPdf } from "@/lib/extract-recipe";
 import { extractLargestJpeg } from "@/lib/pdf-images";
 import { inspectPdf } from "@/lib/pdf-inspect";
-import { storeFile } from "@/lib/storage";
+import { blobStoreId, storeFile } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/session";
 
 /**
@@ -45,6 +45,12 @@ export async function POST(request: Request) {
     console.error("[meal-magic] upload failed", error);
 
     if (error instanceof BlobError) {
+      // Name the store, so a token pasted from the wrong one is obvious. The
+      // error text talks about the store's configuration, which sends you to
+      // the store's settings when the mistake is actually in the variable.
+      console.error(
+        `[meal-magic] blob store in use: ${blobStoreId() ?? "unknown"}`,
+      );
       return NextResponse.json(
         {
           error:

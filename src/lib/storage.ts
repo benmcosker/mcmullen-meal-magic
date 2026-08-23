@@ -21,6 +21,25 @@ export function usingBlobStorage(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
+/**
+ * Which blob store the configured token actually points at.
+ *
+ * Vercel's tokens are shaped `vercel_blob_rw_<storeId>_<secret>`, so the store
+ * is identifiable without revealing the credential - the secret tail is never
+ * returned. Worth having because two tokens for two stores look identical at a
+ * glance, and pasting the wrong one produces an error about the store's
+ * configuration rather than about the token, which sends you to the wrong
+ * dashboard page.
+ */
+export function blobStoreId(): string | null {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) return null;
+
+  const parts = token.split("_");
+  // vercel, blob, rw, <storeId>, <secret...>
+  return parts.length >= 5 && parts[3] ? parts[3] : null;
+}
+
 export async function storeFile(
   data: Buffer | Uint8Array,
   filename: string,
