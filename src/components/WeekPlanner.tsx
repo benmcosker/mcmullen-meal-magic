@@ -1,14 +1,17 @@
 "use client";
 
 import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Grid from "@mui/material/Grid";
+import IconButton from "@mui/material/IconButton";
 import CardActionArea from "@mui/material/CardActionArea";
 import Stack from "@mui/material/Stack";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -181,12 +184,37 @@ export function WeekPlanner({
                 <CardContent sx={{ p: 1.5 }}>
                   <Stack
                     direction="row"
-                    sx={{ alignItems: "baseline", gap: 0.75, mb: 1.25 }}
+                    sx={{
+                      alignItems: "baseline",
+                      gap: 0.75,
+                      mb: 1.25,
+                      minHeight: 28,
+                    }}
                   >
                     <Typography variant="subtitle2">{day}</Typography>
                     <Typography variant="caption" color="text.secondary">
                       {date.slice(5)}
                     </Typography>
+                    {/*
+                     * Clearing a day is also offered inside the picker, but
+                     * getting there means opening a dialog to undo something
+                     * you can see. Sits in the header rather than over the
+                     * tile: the tile is a CardActionArea, and a button nested
+                     * inside a button is invalid markup that swallows clicks.
+                     */}
+                    {planned ? (
+                      <Tooltip title={`Remove ${planned.title}`}>
+                        <IconButton
+                          size="small"
+                          aria-label={`Remove ${planned.title} from ${day}`}
+                          disabled={pending}
+                          onClick={() => assign(date, null)}
+                          sx={{ ml: "auto", alignSelf: "center" }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    ) : null}
                   </Stack>
 
                   <CardActionArea
