@@ -128,7 +128,11 @@ function ReviewForm({
 
   return (
     <Box>
-      <Typography variant="overline" color="text.secondary">
+      <Typography
+        variant="overline"
+        color="text.secondary"
+        sx={{ display: "block" }}
+      >
         {myReview ? "Your review" : "Add your review"}
       </Typography>
 
@@ -142,7 +146,11 @@ function ReviewForm({
         // Keep the score rather than silently clearing it - withdrawing is what
         // the Remove button is for.
         onChange={(_, value) => setStars(value ?? stars)}
-        sx={{ display: "block", mt: 0.5 }}
+        // Not display:block. Rating's root is inline-flex, and that flex is
+        // what lays the five stars out in a row - overriding it stacks them
+        // vertically. The overline above is already block, so the stars start
+        // on their own line without any help.
+        sx={{ mt: 0.5 }}
       />
 
       <TextField
