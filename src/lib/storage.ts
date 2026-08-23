@@ -22,7 +22,11 @@ export function usingBlobStorage(): boolean {
 }
 
 /**
- * Which blob store the configured token actually points at.
+ * Which blob store the app writes to.
+ *
+ * Authoritative now that the token is passed explicitly at every call site -
+ * before that, this reported the token's store while the SDK was quietly using
+ * whatever BLOB_STORE_ID named.
  *
  * Vercel's tokens are shaped `vercel_blob_rw_<storeId>_<secret>`, so the store
  * is identifiable without revealing the credential - the secret tail is never
@@ -54,6 +58,14 @@ export async function storeFile(
     const blob = await put(safeName, Buffer.from(data), {
       access: "public",
       contentType,
+      // Passed explicitly, and this matters. Left to resolve itself, the SDK
+      // tries OIDC first: on Vercel a VERCEL_OIDC_TOKEN is always injected, so
+      // if a BLOB_STORE_ID is also set it authenticates against *that* store
+      // and never reads BLOB_READ_WRITE_TOKEN. A stale BLOB_STORE_ID left
+      // behind by a disconnected store therefore silently redirects every
+      // upload, and the error names the wrong store's configuration. Passing
+      // the token short-circuits that: whatever the token says, wins.
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
     return { url: blob.url, pathname: blob.pathname };
   }
@@ -79,7 +91,9 @@ export async function deleteFile(urlOrPathname: string): Promise<void> {
 
   try {
     if (usingBlobStorage()) {
-      await del(urlOrPathname);
+      // Same reasoning as storeFile: name the store via the token, so a delete
+      // cannot go to a different store than the write did.
+      await del(urlOrPathname, { token: process.env.BLOB_READ_WRITE_TOKEN });
       return;
     }
 
