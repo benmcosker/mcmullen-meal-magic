@@ -91,9 +91,12 @@ export function UploadWorkflow() {
         // 409 carries the recipe it matched, so the message can link to it
         // instead of leaving someone to search for it.
         if (payload?.duplicateOf) setDuplicateOf(payload.duplicateOf);
+        // The server names its own failures. Only guess when it could not -
+        // and then guess nothing: claiming a cause we do not know sends people
+        // looking in the wrong place.
         setError(
           payload?.error ??
-            `Upload failed (${response.status}). The PDF may have taken too long to read.`,
+            `Upload failed (${response.status}). Nothing was saved.`,
         );
         return;
       }

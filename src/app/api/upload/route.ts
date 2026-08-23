@@ -1,3 +1,4 @@
+import { BlobError } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
 import {
@@ -25,7 +26,43 @@ export const maxDuration = 60;
 /** PDFs above this are refused outright; the API caps requests at 32 MB. */
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
+/**
+ * Anything that gets past the checks below and still throws.
+ *
+ * Without this, an unexpected failure returns Next's HTML error page. The
+ * client cannot parse that as JSON, falls back to a guessed message, and tells
+ * the person their PDF took too long to read - which sent two of us hunting
+ * timeouts while the real answer (a misconfigured blob store) sat in the logs.
+ *
+ * So: log the real error where an operator will find it, and answer with
+ * something true. Storage failures are named specifically, because those are
+ * configuration problems rather than anything the person uploading did wrong.
+ */
 export async function POST(request: Request) {
+  try {
+    return await handleUpload(request);
+  } catch (error) {
+    console.error("[meal-magic] upload failed", error);
+
+    if (error instanceof BlobError) {
+      return NextResponse.json(
+        {
+          error:
+            "File storage rejected the upload. The recipe was not saved - " +
+            "this is a configuration problem, not a problem with your PDF.",
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Something went wrong reading that PDF. Nothing was saved." },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleUpload(request: Request) {
   // Upload is restricted to signed-in users. This is the enforcement point;
   // hiding the nav link is not.
   const user = await getCurrentUser();
