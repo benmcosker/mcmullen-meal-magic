@@ -84,11 +84,15 @@ describe("amazon provider handoff", () => {
     expect(result.lines[1].amount).toBe("");
   });
 
-  it("includes a pasteable text list", async () => {
+  it("includes a pasteable text list, grouped by aisle", async () => {
     const result = await amazonFreshProvider.handoff(lines, new Date());
     if (!result.ok || result.kind !== "links")
       throw new Error("expected links");
-    expect(result.text).toBe("2 lb chicken breast\nsalt");
+    // This is the version that goes round the shop, so it is laid out the way
+    // the shop is rather than in one alphabetical run.
+    expect(result.text).toBe(
+      "Meat & fish:\n2 lb chicken breast\n\nSpices & seasoning:\nsalt",
+    );
   });
 
   it("refuses an empty list", async () => {
@@ -190,7 +194,20 @@ describe("formatting", () => {
     expect(formatAmount({ ...lines[0], unit: null, quantity: 3 })).toBe("3");
   });
 
-  it("renders a plain-text list one item per line", () => {
-    expect(formatAsPlainText(lines).split("\n")).toHaveLength(2);
+  it("renders one item per line, under an aisle heading", () => {
+    const text = formatAsPlainText(lines);
+    expect(text).toContain("Meat & fish:\n2 lb chicken breast");
+    expect(text).toContain("Spices & seasoning:\nsalt");
+  });
+
+  it("separates aisles with a blank line", () => {
+    // Every notes app renders that as a break, and no list importer treats it
+    // as an item.
+    expect(formatAsPlainText(lines)).toContain("\n\n");
+  });
+
+  it("keeps every item when grouping the text", () => {
+    const text = formatAsPlainText(lines);
+    for (const line of lines) expect(text).toContain(line.name);
   });
 });

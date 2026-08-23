@@ -22,6 +22,7 @@ import {
   setPlannedMealAction,
 } from "@/app/plan/actions";
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
+import { groupBySection } from "@/lib/grocery-sections";
 import type { GroceryLine, WeeklySkipRecord } from "@/lib/grocery";
 import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 
@@ -321,73 +322,87 @@ export function WeekPlanner({
               Plan some meals and the ingredients will collect here.
             </Typography>
           ) : (
-            <Stack
-              spacing={1}
-              sx={{
-                "& > :not(:last-child)": {
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  pb: 1,
-                },
-              }}
-            >
-              {groceries.map((line) => (
-                <Box
-                  key={`${line.name}-${line.unit ?? ""}-${line.quantity ?? "x"}`}
-                  // Stable handle for the row. MUI's generated class names and
-                  // nesting shift between versions, and tests that walk that
-                  // structure silently target the wrong row rather than fail.
-                  data-ingredient={line.name.trim().toLowerCase()}
-                  sx={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 1,
-                    // Controls stay out of the way until the row is
-                    // approached. Forty rows each showing two buttons is
-                    // harder to read than the list being trimmed - but on
-                    // touch there is no hover, so they are always visible
-                    // below md.
-                    "&:hover .row-actions, & .row-actions:focus-within": {
-                      opacity: 1,
-                    },
-                  }}
-                >
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2">
-                      <Box component="span" sx={{ fontWeight: 600 }}>
-                        {formatAmount(line)}
-                      </Box>{" "}
-                      {line.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {line.fromRecipes.join(", ")}
-                    </Typography>
-                  </Box>
+            <Stack spacing={2.5}>
+              {groupBySection(groceries).map((section) => (
+                <Box key={section.id}>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ display: "block", mb: 0.5 }}
+                  >
+                    {section.label}
+                  </Typography>
 
                   <Stack
-                    direction="row"
-                    spacing={0.5}
-                    className="row-actions"
+                    spacing={1}
                     sx={{
-                      opacity: { xs: 1, md: 0 },
-                      transition: "opacity 120ms",
-                      flexShrink: 0,
+                      "& > :not(:last-child)": {
+                        borderBottom: 1,
+                        borderColor: "divider",
+                        pb: 1,
+                      },
                     }}
                   >
-                    <Button
-                      size="small"
-                      disabled={pending}
-                      onClick={() => gotItThisWeek(line.name)}
-                    >
-                      Got it
-                    </Button>
-                    <Button
-                      size="small"
-                      disabled={pending}
-                      onClick={() => alwaysHave(line.name)}
-                    >
-                      Always have
-                    </Button>
+                    {section.items.map((line) => (
+                      <Box
+                        key={`${line.name}-${line.unit ?? ""}-${line.quantity ?? "x"}`}
+                        // Stable handle for the row. MUI's generated class names and
+                        // nesting shift between versions, and tests that walk that
+                        // structure silently target the wrong row rather than fail.
+                        data-ingredient={line.name.trim().toLowerCase()}
+                        sx={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 1,
+                          // Controls stay out of the way until the row is
+                          // approached. Forty rows each showing two buttons is
+                          // harder to read than the list being trimmed - but on
+                          // touch there is no hover, so they are always visible
+                          // below md.
+                          "&:hover .row-actions, & .row-actions:focus-within": {
+                            opacity: 1,
+                          },
+                        }}
+                      >
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography variant="body2">
+                            <Box component="span" sx={{ fontWeight: 600 }}>
+                              {formatAmount(line)}
+                            </Box>{" "}
+                            {line.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {line.fromRecipes.join(", ")}
+                          </Typography>
+                        </Box>
+
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          className="row-actions"
+                          sx={{
+                            opacity: { xs: 1, md: 0 },
+                            transition: "opacity 120ms",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Button
+                            size="small"
+                            disabled={pending}
+                            onClick={() => gotItThisWeek(line.name)}
+                          >
+                            Got it
+                          </Button>
+                          <Button
+                            size="small"
+                            disabled={pending}
+                            onClick={() => alwaysHave(line.name)}
+                          >
+                            Always have
+                          </Button>
+                        </Stack>
+                      </Box>
+                    ))}
                   </Stack>
                 </Box>
               ))}
