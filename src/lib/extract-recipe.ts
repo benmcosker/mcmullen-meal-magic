@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import type { ExtractedRecipe } from "./recipe-schema";
+import { OVEN_TEMP_RANGE, type ExtractedRecipe } from "./recipe-schema";
 
 /**
  * The shape Claude is asked to return.
@@ -23,8 +23,53 @@ const extractionSchema = z.object({
     .int()
     .nullable()
     .describe("Servings/yield, null if absent"),
+  yieldNote: z
+    .string()
+    .nullable()
+    .describe(
+      "Yield exactly as printed if it says more than a number, e.g. " +
+        "'Makes 12 muffins'. Null if the card only gives a serving count.",
+    ),
   prepMinutes: z.number().int().nullable(),
   cookMinutes: z.number().int().nullable(),
+  restMinutes: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Resting, chilling, marinating, rising or proving time in minutes, " +
+        "separate from active cooking. Null if none is given.",
+    ),
+  ovenTemp: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Oven temperature as printed, as a plain number. For a range, take the " +
+        "first. Null if the recipe never uses an oven.",
+    ),
+  ovenTempUnit: z
+    .enum(["FAHRENHEIT", "CELSIUS"])
+    .nullable()
+    .describe(
+      "The unit that temperature was printed in. Required whenever ovenTemp " +
+        "is set; null otherwise. A gas mark is not a temperature - leave both " +
+        "null and mention the gas mark in notes.",
+    ),
+  equipment: z
+    .array(z.string())
+    .describe(
+      "Specific pans, dishes or appliances the recipe requires, as printed, " +
+        "e.g. '9x13 baking dish', 'Dutch oven'. Empty array if none is " +
+        "specified. Do not list everyday utensils.",
+    ),
+  sourceName: z
+    .string()
+    .nullable()
+    .describe(
+      "Publication, book, website or person credited on the card, e.g. " +
+        "'Bon Appetit'. Null if uncredited.",
+    ),
   ingredients: z
     .array(
       z.object({
@@ -74,6 +119,8 @@ Rules:
 - Split combined ingredient lines into separate entries.
 - Convert fractions and ranges to a single number: "1/2" becomes 0.5, "2-3" becomes 2.
 - Keep instruction steps in their original order, one step per array entry.
+- Oven temperature is often printed only inside a step ("bake at 375F for 20 minutes"). Read the steps for it, not just the header block.
+- Give the temperature in the unit the card printed. Do not convert between Fahrenheit and Celsius.
 - If the document is not a recipe, still return your best reading and set confidence to "low".`;
 
 export type ExtractionResult =
@@ -174,9 +221,14 @@ function toExtractedRecipe(
     title: parsed.title.trim(),
     description: parsed.description?.trim() || null,
     servings: parsed.servings && parsed.servings > 0 ? parsed.servings : 4,
+    yieldNote: parsed.yieldNote?.trim() || null,
     prepMinutes: parsed.prepMinutes ?? null,
     cookMinutes: parsed.cookMinutes ?? null,
+    restMinutes: parsed.restMinutes ?? null,
+    ...readOvenTemp(parsed.ovenTemp, parsed.ovenTempUnit),
+    equipment: parsed.equipment.map((e) => e.trim()).filter(Boolean),
     sourceUrl: null,
+    sourceName: parsed.sourceName?.trim() || null,
     notes: parsed.notes?.trim() || null,
     instructions: parsed.instructions.map((s) => s.trim()).filter(Boolean),
     ingredients: parsed.ingredients
@@ -192,4 +244,28 @@ function toExtractedRecipe(
     tags: parsed.tags.map((t) => t.trim()).filter(Boolean),
     confidence: parsed.confidence,
   };
+}
+
+/**
+ * Accept an oven temperature only if it is complete and plausible.
+ *
+ * A temperature with no unit, or one outside what an oven can do, is dropped
+ * rather than passed on. The alternative is a validation failure that loses the
+ * whole extraction over one misread number - the recipe is still worth having,
+ * and the cook can fill the temperature in.
+ */
+function readOvenTemp(
+  temp: number | null,
+  unit: "FAHRENHEIT" | "CELSIUS" | null,
+): Pick<ExtractedRecipe, "ovenTemp" | "ovenTempUnit"> {
+  if (temp == null || unit == null) {
+    return { ovenTemp: null, ovenTempUnit: null };
+  }
+
+  const { min, max } = OVEN_TEMP_RANGE[unit];
+  if (temp < min || temp > max) {
+    return { ovenTemp: null, ovenTempUnit: null };
+  }
+
+  return { ovenTemp: temp, ovenTempUnit: unit };
 }

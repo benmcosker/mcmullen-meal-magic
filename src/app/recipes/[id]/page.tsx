@@ -1,4 +1,6 @@
 import EditIcon from "@mui/icons-material/Edit";
+import KitchenIcon from "@mui/icons-material/Kitchen";
+import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
@@ -16,6 +18,7 @@ import { LinkButton } from "@/components/LinkButton";
 import { RecipeReviews } from "@/components/RecipeReviews";
 import { ReviewStars } from "@/components/ReviewStars";
 import { getMyReview, listReviews } from "@/lib/reviews";
+import { formatMinutes, formatOvenTemp } from "@/lib/temperature";
 import { getRecipe } from "@/lib/recipes";
 import { requireUser } from "@/lib/session";
 
@@ -43,6 +46,8 @@ export default async function RecipePage({
   ]);
 
   const totalMinutes = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
+  const ovenTemp = formatOvenTemp(recipe.ovenTemp, recipe.ovenTempUnit);
+  const restTime = formatMinutes(recipe.restMinutes);
 
   return (
     <AppShell>
@@ -79,9 +84,25 @@ export default async function RecipePage({
       </Box>
 
       <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mb: 3 }}>
-        <Chip label={`Serves ${recipe.servings}`} size="small" />
+        <Chip
+          label={recipe.yieldNote ?? `Serves ${recipe.servings}`}
+          size="small"
+        />
         {totalMinutes > 0 ? (
-          <Chip label={`${totalMinutes} min total`} size="small" />
+          <Chip label={`${formatMinutes(totalMinutes)} total`} size="small" />
+        ) : null}
+        {restTime ? <Chip label={`${restTime} resting`} size="small" /> : null}
+        {/*
+         * Coloured, unlike the rest: the oven has to be on before anything
+         * else happens, so it is the one number worth finding without reading.
+         */}
+        {ovenTemp ? (
+          <Chip
+            icon={<LocalFireDepartmentIcon />}
+            label={ovenTemp}
+            size="small"
+            color="warning"
+          />
         ) : null}
         {recipe.tags.map(({ tag }) => (
           <Chip key={tag.id} label={tag.name} size="small" variant="outlined" />
@@ -169,6 +190,25 @@ export default async function RecipePage({
         <Grid size={{ xs: 12, md: 8 }}>
           <Card>
             <CardContent>
+              {recipe.equipment.length > 0 ? (
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="h3" gutterBottom>
+                    You will need
+                  </Typography>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                    {recipe.equipment.map((item) => (
+                      <Chip
+                        key={item}
+                        icon={<KitchenIcon />}
+                        label={item}
+                        size="small"
+                        variant="outlined"
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              ) : null}
+
               <Typography variant="h3" gutterBottom>
                 Method
               </Typography>
@@ -219,6 +259,7 @@ export default async function RecipePage({
         sx={{ display: "block", mt: 3 }}
       >
         Added by {recipe.createdBy.name}
+        {recipe.sourceName ? <> · From {recipe.sourceName}</> : null}
         {recipe.sourceUrl ? (
           <>
             {" · "}

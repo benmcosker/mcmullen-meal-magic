@@ -115,6 +115,14 @@ model Invite {
 // ---------------------------------------------------------------------------
 
 /// How a recipe got into the library. Extracted recipes carry their source PDF.
+/// Oven temperatures are stored in the unit the card printed them in.
+/// Converting on the way in would turn a clean 180C into 356F, and the cook
+/// reading the card wants to see the number they can dial.
+enum TemperatureUnit {
+  FAHRENHEIT
+  CELSIUS
+}
+
 enum RecipeSource {
   MANUAL
   PDF
@@ -128,10 +136,29 @@ model Recipe {
   prepMinutes  Int?
   cookMinutes  Int?
   sourceUrl    String?
+  /// Where it came from, by name: "Bon Appetit", "Nana's card". A URL is not
+  /// always available, and often the provenance is the point.
+  sourceName   String?
   /// Ordered preparation steps.
   instructions String[]     @default([])
   notes        String?
   source       RecipeSource @default(MANUAL)
+
+  /// Oven temperature as printed, with the unit it was printed in. Either both
+  /// are set or neither is - a number with no unit is not a temperature, and
+  /// the migration has a CHECK constraint saying so.
+  ovenTemp     Int?
+  ovenTempUnit TemperatureUnit?
+  /// Resting, chilling, marinating, proving. Kept apart from cook time because
+  /// it changes when you have to start, not how long you stand at the stove -
+  /// which is exactly what a weeknight plan needs to know.
+  restMinutes  Int?
+  /// "Makes 12 muffins", "Serves 4 as a main, 6 as a starter". The integer
+  /// servings drives the shopping maths; this says what the card said.
+  yieldNote    String?
+  /// "9x13 pan", "Dutch oven", "Stand mixer". Worth knowing before you start
+  /// rather than at step four.
+  equipment    String[]     @default([])
 
   /// Blob URLs. Both optional: the dish photo especially is best-effort, since
   /// not every PDF contains one.
