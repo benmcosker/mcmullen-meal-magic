@@ -1,11 +1,11 @@
 "use client";
 
-import RestaurantIcon from "@mui/icons-material/Restaurant";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
 import type { ReviewSummary } from "@/lib/review-schema";
 
+import { RecipePlaceholder } from "./RecipePlaceholder";
 import { ReviewStars } from "./ReviewStars";
 
 export type TileRecipe = {
@@ -19,9 +19,9 @@ export type TileRecipe = {
 /**
  * A recipe as a picture and a name.
  *
- * Recipes without a photo get a tinted panel rather than a broken frame or a
- * stock image - plenty of recipes arrive without one, and pretending otherwise
- * looks worse than an honest placeholder.
+ * Recipes without a photo get the shared placeholder rather than a broken
+ * frame or a stock image - plenty arrive without one, and pretending otherwise
+ * looks worse than admitting it.
  */
 export function RecipeTile({
   recipe,
@@ -46,20 +46,11 @@ export function RecipeTile({
           }}
         />
       ) : (
-        <Box
-          sx={{
-            width: "100%",
-            height,
-            borderRadius: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: "action.hover",
-            color: "text.disabled",
-          }}
-        >
-          <RestaurantIcon fontSize="small" />
-        </Box>
+        <RecipePlaceholder
+          seed={recipe.id}
+          title={recipe.title}
+          height={height}
+        />
       )}
 
       <Typography

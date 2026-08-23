@@ -13,6 +13,7 @@ import { AppShell } from "@/components/AppShell";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { LinkButton } from "@/components/LinkButton";
 import { ReviewStars } from "@/components/ReviewStars";
+import { RecipePlaceholder } from "@/components/RecipePlaceholder";
 import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
 import { searchRecipes } from "@/lib/recipes";
@@ -103,7 +104,17 @@ export default async function RecipesPage({
                       alt=""
                       sx={{ height: 160, objectFit: "cover" }}
                     />
-                  ) : null}
+                  ) : (
+                    // Not omitted: a card with no image is shorter than its
+                    // neighbours, and a grid of mismatched heights reads as
+                    // broken rather than as "this one has no photo".
+                    <RecipePlaceholder
+                      seed={recipe.id}
+                      title={recipe.title}
+                      height={160}
+                      showTitle
+                    />
+                  )}
                   <CardContent>
                     <Typography variant="h3" gutterBottom>
                       {recipe.title}

@@ -13,6 +13,7 @@ import { AppShell } from "@/components/AppShell";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { IconChip } from "@/components/IconChip";
 import { LinkButton } from "@/components/LinkButton";
+import { RecipePlaceholder } from "@/components/RecipePlaceholder";
 import { RecipeReviews } from "@/components/RecipeReviews";
 import { ReviewStars } from "@/components/ReviewStars";
 import { getMyReview, listReviews } from "@/lib/reviews";
@@ -125,7 +126,16 @@ export default async function RecipePage({
             mb: 3,
           }}
         />
-      ) : null}
+      ) : (
+        <Box sx={{ mb: 3 }}>
+          <RecipePlaceholder
+            seed={recipe.id}
+            title={recipe.title}
+            height={{ xs: 160, sm: 220 }}
+            showTitle
+          />
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 4 }}>
