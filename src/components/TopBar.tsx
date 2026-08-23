@@ -15,6 +15,7 @@ import { signOut } from "@/lib/auth-client";
 const navItems = [
   { href: "/recipes", label: "Recipes" },
   { href: "/plan", label: "This week" },
+  { href: "/pantry", label: "Pantry" },
   { href: "/upload", label: "Upload" },
 ] as const;
 

@@ -6,11 +6,12 @@ import { prisma } from "@/lib/db";
 import {
   addDays,
   aggregateIngredients,
-  getSkipsForWeek,
   getWeekPlan,
-  toSkipSet,
+  getWeeklySkips,
+  buildExclusions,
   weekStartOf,
 } from "@/lib/grocery";
+import { listPantryItems } from "@/lib/pantry";
 import { NO_REVIEWS } from "@/lib/review-schema";
 import { getReviewSummaries } from "@/lib/reviews";
 import { listProviders } from "@/lib/shopping";
@@ -25,20 +26,21 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     weekParam ? new Date(`${weekParam}T00:00:00.000Z`) : new Date(),
   );
 
-  const [meals, recipes, skips] = await Promise.all([
+  const [meals, recipes, skips, pantry] = await Promise.all([
     getWeekPlan(weekStart),
     prisma.recipe.findMany({
       select: { id: true, title: true, servings: true, imageUrl: true },
       orderBy: { title: "asc" },
     }),
-    getSkipsForWeek(weekStart),
+    getWeeklySkips(weekStart),
+    listPantryItems(),
   ]);
 
   // Review scores on the picker tiles: choosing dinner is exactly when it helps
   // to see which of these the household actually liked.
   const summaries = await getReviewSummaries(recipes.map((r) => r.id));
 
-  const groceries = aggregateIngredients(meals, toSkipSet(skips));
+  const groceries = aggregateIngredients(meals, buildExclusions(pantry, skips));
 
   return (
     <AppShell>
@@ -62,6 +64,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         }))}
         groceries={groceries}
         skips={skips}
+        pantry={pantry}
         providers={listProviders()}
       />
     </AppShell>

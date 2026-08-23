@@ -19,15 +19,17 @@ import {
   setPlannedMealAction,
 } from "@/app/plan/actions";
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
-import type { GroceryLine, SkipRecord } from "@/lib/grocery";
+import type { GroceryLine, WeeklySkipRecord } from "@/lib/grocery";
 import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 
-import { skipIngredientAction } from "@/app/plan/skip-actions";
+import { addToPantryAction, skipForWeekAction } from "@/app/plan/skip-actions";
 
 import { RecipePickerDialog } from "./RecipePickerDialog";
 import { RecipeTile, type TileRecipe } from "./RecipeTile";
 import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
-import { SkippedIngredients } from "./SkippedIngredients";
+import type { PantryItemRecord } from "@/lib/pantry";
+
+import { ExcludedIngredients } from "./ExcludedIngredients";
 
 /**
  * One meal a day.
@@ -78,6 +80,7 @@ export function WeekPlanner({
   meals,
   groceries,
   skips,
+  pantry,
   providers,
 }: {
   weekStartIso: string;
@@ -86,7 +89,8 @@ export function WeekPlanner({
   recipes: (TileRecipe & { servings: number })[];
   meals: PlannedMeal[];
   groceries: GroceryLine[];
-  skips: SkipRecord[];
+  skips: WeeklySkipRecord[];
+  pantry: PantryItemRecord[];
   providers: ProviderInfo[];
 }) {
   const router = useRouter();
@@ -112,9 +116,16 @@ export function WeekPlanner({
     });
   }
 
-  function skip(name: string, scope: "WEEK" | "ALWAYS") {
+  function gotItThisWeek(name: string) {
     startTransition(async () => {
-      await skipIngredientAction(name, scope, weekStartIso);
+      await skipForWeekAction(name, weekStartIso);
+      router.refresh();
+    });
+  }
+
+  function alwaysHave(name: string) {
+    startTransition(async () => {
+      await addToPantryAction(name);
       router.refresh();
     });
   }
@@ -338,14 +349,14 @@ export function WeekPlanner({
                     <Button
                       size="small"
                       disabled={pending}
-                      onClick={() => skip(line.name, "WEEK")}
+                      onClick={() => gotItThisWeek(line.name)}
                     >
                       Got it
                     </Button>
                     <Button
                       size="small"
                       disabled={pending}
-                      onClick={() => skip(line.name, "ALWAYS")}
+                      onClick={() => alwaysHave(line.name)}
                     >
                       Always have
                     </Button>
@@ -355,7 +366,7 @@ export function WeekPlanner({
             </Stack>
           )}
 
-          <SkippedIngredients skips={skips} />
+          <ExcludedIngredients pantry={pantry} skips={skips} />
         </CardContent>
       </Card>
     </Stack>

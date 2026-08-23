@@ -24,7 +24,8 @@ model User {
   invitesSent        Invite[]            @relation("InviteSender")
   inviteUsed         Invite?             @relation("InviteRedeemer")
   shoppingRuns       ShoppingHandoff[]
-  skippedIngredients SkippedIngredient[]
+  pantryItems        PantryItem[]
+  weeklySkips        WeeklySkip[]
   reviews            RecipeReview[]
 
   @@unique([email])
@@ -306,51 +307,48 @@ model PlannedMeal {
 }
 
 /// How long an ingredient stays off the shopping list.
-enum SkipScope {
-  /// Just the week it was skipped in - "we already have milk this week".
-  WEEK
-  /// Every week. Pantry staples: salt, oil, flour. The things that pad a list
-  /// to forty lines and are never actually bought.
-  ALWAYS
-}
-
-/// An ingredient the household does not want on the shopping list.
+/// A staple the household always has in: salt, olive oil, flour.
 ///
-/// Stored as an exclusion rather than materialising the whole list, because
-/// the list is derived from the week's planned meals and changes whenever the
-/// plan does. Materialising it would mean reconciling a regenerated list
-/// against hand edits on every change; an exclusion needs no reconciliation -
-/// it just keeps suppressing a name.
-///
-/// Matching is on `normalisedName`, so "Olive Oil" and "olive oil" are the
-/// same staple.
-model SkippedIngredient {
-  id             String    @id @default(cuid())
-  /// As the household typed or saw it, for display.
+/// The point of the pantry is that these never reach a shopping list. Keeping
+/// them in their own table rather than as a flavour of "skip" means they can be
+/// managed as a list in their own right - added before they ever show up on a
+/// week's shopping, rather than only dismissed after they do.
+model PantryItem {
+  id             String   @id @default(cuid())
+  /// As typed, for display.
   name           String
-  /// Lower-cased and trimmed, for matching.
-  normalisedName String
-  scope          SkipScope
-  /// Set for WEEK scope, null for ALWAYS.
-  weekStart      DateTime? @db.Date
-  createdAt      DateTime  @default(now())
+  /// Lower-cased and trimmed, for matching against recipe ingredients. Unique
+  /// outright: a pantry with "Olive Oil" and "olive oil" in it is a bug.
+  normalisedName String   @unique
+  createdAt      DateTime @default(now())
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
-  /// One row per name per week, and one permanent row per name. Postgres treats
-  /// NULLs as distinct in a unique index, so the ALWAYS rows are constrained by
-  /// the partial index in the migration instead.
-  @@unique([normalisedName, weekStart])
   @@index([createdById])
-  @@map("skipped_ingredient")
+  @@map("pantry_item")
 }
 
-/// Where a week's shopping list was sent.
+/// "We already have milk, do not put it on this week's list."
 ///
-/// Only Instacart builds a real cart. Amazon has no public Fresh/Whole Foods
-/// ordering API, so those providers hand over deep links instead - see
-/// src/lib/shopping/amazon.ts.
+/// Distinct from the pantry: this expires. Next week milk is back on the list,
+/// which is what you want for something you ran out of rather than something
+/// you always keep.
+model WeeklySkip {
+  id             String   @id @default(cuid())
+  name           String
+  normalisedName String
+  weekStart      DateTime @db.Date
+  createdAt      DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([normalisedName, weekStart])
+  @@index([createdById])
+  @@map("weekly_skip")
+}
+
 enum ShoppingProvider {
   INSTACART
   AMAZON_FRESH

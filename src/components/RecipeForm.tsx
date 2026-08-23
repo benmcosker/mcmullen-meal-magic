@@ -273,6 +273,7 @@ export function RecipeForm({
                   fullWidth
                 />
                 <Button
+                  aria-label="Add equipment"
                   onClick={addEquipment}
                   disabled={!equipmentDraft.trim()}
                 >
@@ -375,6 +376,13 @@ export function RecipeForm({
                   {index + 1}.
                 </Typography>
                 <TextField
+                  // The visible "1." beside it is a Typography, not a label,
+                  // so without this a screen reader reaches an unnamed box.
+                  // It has to go through slotProps: TextField spreads unknown
+                  // props onto the wrapper, where aria-label does nothing.
+                  slotProps={{
+                    htmlInput: { "aria-label": `Step ${index + 1}` },
+                  }}
                   value={step}
                   onChange={(e) =>
                     setSteps(
@@ -440,7 +448,9 @@ export function RecipeForm({
                 }
               }}
             />
-            <Button onClick={addTag}>Add</Button>
+            <Button aria-label="Add tag" onClick={addTag}>
+              Add
+            </Button>
           </Stack>
         </CardContent>
       </Card>

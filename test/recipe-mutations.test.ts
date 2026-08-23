@@ -180,7 +180,8 @@ describe("recipeInput validation", () => {
 async function reset() {
   await prisma.recipeTag.deleteMany();
   await prisma.ingredient.deleteMany();
-  await prisma.skippedIngredient.deleteMany();
+  await prisma.pantryItem.deleteMany();
+  await prisma.weeklySkip.deleteMany();
   await prisma.plannedMeal.deleteMany();
   await prisma.shoppingHandoff.deleteMany();
   await prisma.recipe.deleteMany();

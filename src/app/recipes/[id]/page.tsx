@@ -1,7 +1,4 @@
 import EditIcon from "@mui/icons-material/Edit";
-import KitchenIcon from "@mui/icons-material/Kitchen";
-import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -14,6 +11,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/AppShell";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
+import { IconChip } from "@/components/IconChip";
 import { LinkButton } from "@/components/LinkButton";
 import { RecipeReviews } from "@/components/RecipeReviews";
 import { ReviewStars } from "@/components/ReviewStars";
@@ -97,24 +95,19 @@ export default async function RecipePage({
          * else happens, so it is the one number worth finding without reading.
          */}
         {ovenTemp ? (
-          <Chip
-            icon={<LocalFireDepartmentIcon />}
-            label={ovenTemp}
-            size="small"
-            color="warning"
-          />
+          <IconChip icon="oven" label={ovenTemp} size="small" color="warning" />
         ) : null}
         {recipe.tags.map(({ tag }) => (
           <Chip key={tag.id} label={tag.name} size="small" variant="outlined" />
         ))}
         {recipe.pdfUrl ? (
-          <Chip
+          <IconChip
+            icon="pdf"
             component="a"
             href={recipe.pdfUrl}
             target="_blank"
             rel="noopener noreferrer"
             clickable
-            icon={<PictureAsPdfIcon />}
             label={recipe.pdfFilename ?? "Original PDF"}
             size="small"
             variant="outlined"
@@ -197,9 +190,9 @@ export default async function RecipePage({
                   </Typography>
                   <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
                     {recipe.equipment.map((item) => (
-                      <Chip
+                      <IconChip
                         key={item}
-                        icon={<KitchenIcon />}
+                        icon="equipment"
                         label={item}
                         size="small"
                         variant="outlined"
