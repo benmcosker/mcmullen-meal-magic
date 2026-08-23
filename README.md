@@ -1,24 +1,36 @@
 # Meal Magic
 
 Recipe box, weekly meal planner and grocery list for the McMullen household.
-Upload a recipe PDF, plan the week from your library, and hand the resulting
-shopping list to Instacart.
+Upload a recipe PDF, plan a dinner for each night from your library, and take
+the resulting shopping list to the shop.
 
 ## What works
 
 - **Invite-only accounts.** Signup requires a code minted by an existing user.
   Every recipe is visible to every signed-in user; the library is shared.
 - **Recipe library.** Create, edit and delete recipes with ingredients, method,
-  servings, timings and tags.
+  servings, timings, oven temperature, resting time, yield, equipment and tags -
+  everything a recipe card prints, so you never have to reopen the original.
 - **Search.** Full-text plus substring matching across titles, descriptions,
   method text, ingredients and tags, with tag filters. Search state lives in the
   URL, so a filtered view is linkable.
 - **PDF upload.** Signed-in users upload a recipe PDF; Claude extracts the
   fields and the dish photo is pulled out of the PDF, both landing on a review
   screen before anything is saved.
-- **Weekly planner.** Assign recipes to breakfast/lunch/dinner across a week.
+- **Reviews.** A star rating and, optionally, what you thought - one review per
+  person per recipe, so the average says how many people liked a dish rather
+  than how often its keenest fan said so. The average shows on the library
+  cards, the planner tiles and the recipe itself.
+- **Duplicate detection.** A re-uploaded PDF is recognised by its bytes and
+  refused before the model is called; a familiar-looking title warns rather
+  than blocks.
+- **Weekly planner.** One dinner a night, picked from tiles showing the dish
+  photo, title and its rating.
+- **Pantry.** The staples you always have in, managed as a list of their own.
+  Nothing in it ever reaches a shopping list, however many recipes call for it.
 - **Grocery list.** Ingredients roll up across the week's meals, scaled to the
-  servings planned and merged where names and units agree.
+  servings planned and merged where names and units agree. Pantry staples and
+  anything ticked off for the week drop out before the merge.
 - **Shopping hand-off.** Send the week's list to Amazon Fresh or Whole Foods (a
   search link per ingredient plus a copyable list). An Instacart provider that
   builds a real cart is written and tested but cannot be enabled — see below.
@@ -33,7 +45,7 @@ shopping list to Instacart.
 | Database  | Postgres via Prisma 7                         |
 | Auth      | Better Auth (email + password, invite-gated)  |
 | Storage   | Vercel Blob, with a local-disk driver for dev |
-| AI        | Claude (`claude-opus-5`) for PDF extraction   |
+| AI        | Claude for PDF extraction                     |
 | Tests     | Vitest, against a real Postgres               |
 
 ## Getting started
