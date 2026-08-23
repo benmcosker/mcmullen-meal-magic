@@ -11,6 +11,8 @@ import {
   toSkipSet,
   weekStartOf,
 } from "@/lib/grocery";
+import { NO_REVIEWS } from "@/lib/review-schema";
+import { getReviewSummaries } from "@/lib/reviews";
 import { listProviders } from "@/lib/shopping";
 import { requireUser } from "@/lib/session";
 
@@ -32,6 +34,10 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     getSkipsForWeek(weekStart),
   ]);
 
+  // Review scores on the picker tiles: choosing dinner is exactly when it helps
+  // to see which of these the household actually liked.
+  const summaries = await getReviewSummaries(recipes.map((r) => r.id));
+
   const groceries = aggregateIngredients(meals, toSkipSet(skips));
 
   return (
@@ -43,7 +49,10 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         weekStartIso={weekStart.toISOString().slice(0, 10)}
         prevWeekIso={addDays(weekStart, -7).toISOString().slice(0, 10)}
         nextWeekIso={addDays(weekStart, 7).toISOString().slice(0, 10)}
-        recipes={recipes}
+        recipes={recipes.map((recipe) => ({
+          ...recipe,
+          reviews: summaries.get(recipe.id) ?? NO_REVIEWS,
+        }))}
         meals={meals.map((meal) => ({
           date: meal.date.toISOString().slice(0, 10),
           slot: meal.slot,

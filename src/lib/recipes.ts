@@ -1,6 +1,8 @@
 import { Prisma } from "@/generated/prisma/client";
 
 import { prisma } from "./db";
+import { NO_REVIEWS, type ReviewSummary } from "./review-schema";
+import { getReviewSummaries } from "./reviews";
 
 export type RecipeSearchHit = {
   id: string;
@@ -101,11 +103,30 @@ const recipeInclude = {
   ingredients: { orderBy: { position: "asc" } },
   tags: { include: { tag: true } },
   createdBy: { select: { id: true, name: true } },
+  _count: { select: { reviews: true } },
 } satisfies Prisma.RecipeInclude;
 
+/**
+ * The review average rides along with every recipe the app loads.
+ *
+ * Prisma cannot average a relation inside an `include`, so it is a second
+ * query stitched on here rather than at each call site - otherwise every new
+ * page that shows a recipe has to remember to fetch it, and the one that
+ * forgets shows an unreviewed dish.
+ */
 export type RecipeWithRelations = Prisma.RecipeGetPayload<{
   include: typeof recipeInclude;
-}>;
+}> & { reviews: ReviewSummary };
+
+async function withReviewSummaries<T extends { id: string }>(
+  recipes: T[],
+): Promise<(T & { reviews: ReviewSummary })[]> {
+  const summaries = await getReviewSummaries(recipes.map((r) => r.id));
+  return recipes.map((recipe) => ({
+    ...recipe,
+    reviews: summaries.get(recipe.id) ?? NO_REVIEWS,
+  }));
+}
 
 /** Search and hydrate in one call, preserving rank order. */
 export async function searchRecipes(
@@ -115,10 +136,12 @@ export async function searchRecipes(
   if (hits.length === 0) return [];
 
   const ids = hits.map((h) => h.id);
-  const recipes = await prisma.recipe.findMany({
-    where: { id: { in: ids } },
-    include: recipeInclude,
-  });
+  const recipes = await withReviewSummaries(
+    await prisma.recipe.findMany({
+      where: { id: { in: ids } },
+      include: recipeInclude,
+    }),
+  );
 
   // `IN (...)` does not preserve order, so restore the ranking from the search.
   const byId = new Map(recipes.map((r) => [r.id, r]));
@@ -130,7 +153,14 @@ export async function searchRecipes(
 export async function getRecipe(
   id: string,
 ): Promise<RecipeWithRelations | null> {
-  return prisma.recipe.findUnique({ where: { id }, include: recipeInclude });
+  const recipe = await prisma.recipe.findUnique({
+    where: { id },
+    include: recipeInclude,
+  });
+  if (!recipe) return null;
+
+  const [withSummary] = await withReviewSummaries([recipe]);
+  return withSummary;
 }
 
 /** Turn free-text tag names into Tag rows, reusing any that already exist. */

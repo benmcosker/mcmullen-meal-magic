@@ -25,6 +25,7 @@ model User {
   inviteUsed         Invite?             @relation("InviteRedeemer")
   shoppingRuns       ShoppingHandoff[]
   skippedIngredients SkippedIngredient[]
+  reviews            RecipeReview[]
 
   @@unique([email])
   @@map("user")
@@ -152,6 +153,7 @@ model Recipe {
   ingredients  Ingredient[]
   tags         RecipeTag[]
   plannedMeals PlannedMeal[]
+  reviews      RecipeReview[]
 
   /// Maintained by a trigger (see the recipe_search migration), not by Prisma.
   /// Declared here only so migrations do not drop a column they cannot model.
@@ -210,6 +212,43 @@ model RecipeTag {
 // ---------------------------------------------------------------------------
 // Weekly planning
 // ---------------------------------------------------------------------------
+
+/// One person's verdict on one recipe: a score, and optionally what they
+/// thought.
+///
+/// Stars and words are one record rather than two. A five-star score with no
+/// explanation is worth less than "five stars, but halve the chilli", and a
+/// note from someone who never said whether they liked the dish leaves the
+/// reader guessing. Tying them together means every opinion carries a score
+/// and every score can carry its reasoning.
+///
+/// One review per person per recipe, so the average reflects how many people
+/// liked a dish rather than how many times its keenest fan said so. Cooking it
+/// again and changing your mind edits the review you already left.
+model RecipeReview {
+  id    String @id @default(cuid())
+  /// Whole stars, 1 to 5. Required - a review with no score is a note, and the
+  /// range is enforced by a CHECK constraint in the migration as well as here,
+  /// because an average is only meaningful if nothing off the scale can reach
+  /// the column.
+  stars Int
+  /// What they thought. Optional, so rating a dish stays a two-second job for
+  /// anyone with nothing to add.
+  body  String?
+
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([recipeId, userId])
+  @@index([recipeId, createdAt])
+  @@index([userId])
+  @@map("recipe_review")
+}
 
 enum MealSlot {
   BREAKFAST

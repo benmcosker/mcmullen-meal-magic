@@ -13,6 +13,9 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { LinkButton } from "@/components/LinkButton";
+import { RecipeReviews } from "@/components/RecipeReviews";
+import { ReviewStars } from "@/components/ReviewStars";
+import { getMyReview, listReviews } from "@/lib/reviews";
 import { getRecipe } from "@/lib/recipes";
 import { requireUser } from "@/lib/session";
 
@@ -28,11 +31,16 @@ function formatQuantity(quantity: number | null, unit: string | null): string {
 export default async function RecipePage({
   params,
 }: PageProps<"/recipes/[id]">) {
-  await requireUser();
+  const user = await requireUser();
 
   const { id } = await params;
   const recipe = await getRecipe(id);
   if (!recipe) notFound();
+
+  const [reviews, myReview] = await Promise.all([
+    listReviews(recipe.id),
+    getMyReview(recipe.id, user.id),
+  ]);
 
   const totalMinutes = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
 
@@ -65,6 +73,10 @@ export default async function RecipePage({
           {recipe.description}
         </Typography>
       ) : null}
+
+      <Box sx={{ mb: 2 }}>
+        <ReviewStars summary={recipe.reviews} />
+      </Box>
 
       <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mb: 3 }}>
         <Chip label={`Serves ${recipe.servings}`} size="small" />
@@ -188,6 +200,18 @@ export default async function RecipePage({
           </Card>
         </Grid>
       </Grid>
+
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <RecipeReviews
+            recipeId={recipe.id}
+            summary={recipe.reviews}
+            reviews={reviews}
+            myReview={myReview}
+            currentUserId={user.id}
+          />
+        </CardContent>
+      </Card>
 
       <Typography
         variant="caption"
