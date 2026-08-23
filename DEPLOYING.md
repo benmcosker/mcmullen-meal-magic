@@ -50,16 +50,16 @@ one.
 
 Set these in **Settings → Environment Variables**, for Production and Preview:
 
-| Variable                | Required | Value                                                                                                                                          |
-| ----------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`          | yes      | Neon **pooled** string                                                                                                                         |
-| `DIRECT_DATABASE_URL`   | yes      | Neon **direct** string                                                                                                                         |
-| `BETTER_AUTH_SECRET`    | yes      | `openssl rand -base64 32` — a fresh one, not the dev value                                                                                     |
-| `BETTER_AUTH_URL`       | yes      | The deployed origin, e.g. `https://meal-magic.vercel.app`                                                                                      |
-| `ANTHROPIC_API_KEY`     | no       | Enables PDF extraction                                                                                                                         |
-| `INSTACART_API_KEY`     | no       | **Not obtainable.** Instacart has closed new developer applications with no waitlist. Leave unset; the button stays disabled and explains why. |
-| `INSTACART_API_BASE`    | no       | Only meaningful once a key exists: `https://connect.dev.instacart.tools` for development, `https://connect.instacart.com` for production       |
-| `BLOB_READ_WRITE_TOKEN` | —        | Injected by Vercel when the Blob store is connected                                                                                            |
+| Variable                | Required | Value                                                                                                                                         |
+| ----------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`          | yes      | Neon **pooled** string                                                                                                                        |
+| `DIRECT_DATABASE_URL`   | yes      | Neon **direct** string                                                                                                                        |
+| `BETTER_AUTH_SECRET`    | yes      | `openssl rand -base64 32` — a fresh one, not the dev value                                                                                    |
+| `BETTER_AUTH_URL`       | yes      | The deployed origin, e.g. `https://meal-magic.vercel.app`                                                                                     |
+| `ANTHROPIC_API_KEY`     | no       | Enables PDF extraction                                                                                                                        |
+| `INSTACART_API_KEY`     | no       | **Not obtainable.** Instacart has closed new developer applications with no waitlist. Leave unset; the provider is hidden until a key exists. |
+| `INSTACART_API_BASE`    | no       | Only meaningful once a key exists: `https://connect.dev.instacart.tools` for development, `https://connect.instacart.com` for production      |
+| `BLOB_READ_WRITE_TOKEN` | —        | Injected by Vercel when the Blob store is connected                                                                                           |
 
 The app refuses to start if a required variable is missing, and names all of
 them at once rather than failing on the first. Optional ones are logged at boot

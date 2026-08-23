@@ -14,7 +14,7 @@ import {
 import { listPantryItems } from "@/lib/pantry";
 import { NO_REVIEWS } from "@/lib/review-schema";
 import { getReviewSummaries } from "@/lib/reviews";
-import { listProviders } from "@/lib/shopping";
+import { listUsableProviders } from "@/lib/shopping";
 import { requireUser } from "@/lib/session";
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
@@ -65,7 +65,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         groceries={groceries}
         skips={skips}
         pantry={pantry}
-        providers={listProviders()}
+        providers={listUsableProviders()}
       />
     </AppShell>
   );

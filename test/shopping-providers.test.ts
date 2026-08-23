@@ -6,7 +6,13 @@ import {
   buildStoreUrl,
   wholeFoodsProvider,
 } from "@/lib/shopping/amazon";
-import { formatAmount, formatAsPlainText, listProviders } from "@/lib/shopping";
+import {
+  formatAmount,
+  formatAsPlainText,
+  getProvider,
+  listProviders,
+  listUsableProviders,
+} from "@/lib/shopping";
 import type { GroceryLine } from "@/lib/grocery";
 
 const lines: GroceryLine[] = [
@@ -140,6 +146,40 @@ describe("listProviders", () => {
     delete process.env.INSTACART_API_KEY;
     const amazon = listProviders().filter((p) => p.id !== "INSTACART");
     expect(amazon.every((p) => p.available)).toBe(true);
+  });
+});
+
+describe("what the planner is offered", () => {
+  it("leaves Instacart out entirely while no key exists", () => {
+    // Not hidden because it is Instacart - hidden because it cannot do
+    // anything. A greyed-out button above a sentence explaining that it will
+    // never work is a notice, not an option, and it would sit on the page
+    // every week saying the same thing.
+    delete process.env.INSTACART_API_KEY;
+    expect(listUsableProviders().map((p) => p.id)).toEqual([
+      "AMAZON_FRESH",
+      "WHOLE_FOODS",
+    ]);
+  });
+
+  it("brings it back on its own the day a key is set", () => {
+    // The point of filtering on `available` rather than naming Instacart: no
+    // code change is needed when applications reopen.
+    process.env.INSTACART_API_KEY = "k";
+    expect(listUsableProviders().map((p) => p.id)).toContain("INSTACART");
+  });
+
+  it("keeps the registry complete either way", () => {
+    // Hiding it from the UI must not unregister it, or the handoff route
+    // would fail to find the adapter for a provider it was asked to use.
+    delete process.env.INSTACART_API_KEY;
+    expect(listProviders().map((p) => p.id)).toContain("INSTACART");
+    expect(getProvider("INSTACART")).toBeDefined();
+  });
+
+  it("offers every provider it lists as usable", () => {
+    delete process.env.INSTACART_API_KEY;
+    expect(listUsableProviders().every((p) => p.available)).toBe(true);
   });
 });
 

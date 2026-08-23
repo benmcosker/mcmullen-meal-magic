@@ -33,7 +33,8 @@ the resulting shopping list to the shop.
   anything ticked off for the week drop out before the merge.
 - **Shopping hand-off.** Send the week's list to Amazon Fresh or Whole Foods (a
   search link per ingredient plus a copyable list). An Instacart provider that
-  builds a real cart is written and tested but cannot be enabled — see below.
+  builds a real cart is written and tested but hidden until a key exists — see
+  below.
 
 ## Stack
 
@@ -149,6 +150,13 @@ or it does not.
 not accepting new developer applications and offers no waitlist, which rules out
 development and production keys alike — this is not a lead time to plan around,
 it is a closed door.
+
+The integration is kept intact rather than deleted, but it says nothing about
+itself: no boot warning, no entry in `/api/health`, and no greyed-out button on
+the planner. A permanent notice about something nobody can act on is how people
+learn to read past notices. The planner offers whatever `listUsableProviders()`
+returns, which filters on `available` rather than naming Instacart — so setting
+`INSTACART_API_KEY` is the whole of the work if applications reopen.
 
 The integration is kept rather than removed: it is written and tested, and works
 the day applications reopen. Until then the Instacart button is disabled and says
