@@ -79,6 +79,10 @@ export function RecipePlaceholder({
       {showTitle ? (
         <Typography
           variant="h3"
+          // Styled like a heading, not marked up as one. These initials are
+          // decoration beside the real title, and emitting an <h3> for them
+          // puts a second, meaningless entry in the page's heading outline.
+          component="span"
           sx={{ letterSpacing: 1, opacity: 0.85, fontWeight: 700 }}
         >
           {initials(title)}

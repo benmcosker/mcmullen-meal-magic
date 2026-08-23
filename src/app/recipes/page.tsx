@@ -16,6 +16,7 @@ import { ReviewStars } from "@/components/ReviewStars";
 import { RecipePlaceholder } from "@/components/RecipePlaceholder";
 import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
+import { parseSort } from "@/lib/recipe-sort";
 import { searchRecipes } from "@/lib/recipes";
 import { requireUser } from "@/lib/session";
 
@@ -33,8 +34,10 @@ export default async function RecipesPage({
       ? [tagParam]
       : [];
 
+  const sort = parseSort(params.sort);
+
   const [recipes, tags] = await Promise.all([
-    searchRecipes({ query, tagSlugs }),
+    searchRecipes({ query, tagSlugs, sort }),
     listTagsWithCounts(),
   ]);
 

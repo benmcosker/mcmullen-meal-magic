@@ -1,6 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 
 import { prisma } from "./db";
+import { DEFAULT_SORT, type RecipeSort } from "./recipe-sort";
 import { NO_REVIEWS, type ReviewSummary } from "./review-schema";
 import { getReviewSummaries } from "./reviews";
 
@@ -14,6 +15,13 @@ export type RecipeSearchOptions = {
   query?: string;
   /** Tag slugs. A recipe must carry every slug listed to match. */
   tagSlugs?: string[];
+  /**
+   * Defaults to newest, which defers to relevance when there is also a search
+   * query: a search for "lemon" answering with the least relevant match simply
+   * because it was added most recently would be a worse search. Any other
+   * choice is authoritative.
+   */
+  sort?: RecipeSort;
   limit?: number;
   offset?: number;
 };
@@ -41,7 +49,15 @@ export async function searchRecipeIds(
   options: RecipeSearchOptions = {},
 ): Promise<RecipeSearchHit[]> {
   const query = options.query?.trim() ?? "";
+  const sort = options.sort ?? DEFAULT_SORT;
   const tagSlugs = options.tagSlugs?.filter(Boolean) ?? [];
+
+  const orderBy = {
+    newest: Prisma.sql`r."createdAt" DESC`,
+    oldest: Prisma.sql`r."createdAt" ASC`,
+    // Case-insensitive, or "apple crumble" sorts after "Zabaglione".
+    title: Prisma.sql`lower(r."title") ASC`,
+  }[sort];
   const limit = Math.min(options.limit ?? 50, 200);
   const offset = Math.max(options.offset ?? 0, 0);
 
@@ -65,7 +81,7 @@ export async function searchRecipeIds(
       SELECT r."id", 0::float8 AS rank
       FROM "recipe" r
       WHERE TRUE ${tagFilter}
-      ORDER BY r."createdAt" DESC
+      ORDER BY ${orderBy}
       LIMIT ${limit} OFFSET ${offset}
     `);
   }
@@ -94,7 +110,11 @@ export async function searchRecipeIds(
       )
     )
     ${tagFilter}
-    ORDER BY rank DESC, r."createdAt" DESC
+    ORDER BY ${
+      // Relevance leads only for the default order. Someone who has explicitly
+      // asked for oldest or A-Z means it, search or no search.
+      sort === DEFAULT_SORT ? Prisma.sql`rank DESC, ${orderBy}` : orderBy
+    }
     LIMIT ${limit} OFFSET ${offset}
   `);
 }
