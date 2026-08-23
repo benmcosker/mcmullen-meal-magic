@@ -1,4 +1,5 @@
 import AddIcon from "@mui/icons-material/Add";
+import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import CardMedia from "@mui/material/CardMedia";
@@ -10,6 +11,7 @@ import Link from "next/link";
 
 import { AppShell } from "@/components/AppShell";
 import { LinkButton } from "@/components/LinkButton";
+import { ReviewStars } from "@/components/ReviewStars";
 import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
 import { searchRecipes } from "@/lib/recipes";
@@ -107,6 +109,10 @@ export default async function RecipesPage({
                         {recipe.description}
                       </Typography>
                     ) : null}
+                    <Box sx={{ mt: 1.5 }}>
+                      <ReviewStars summary={recipe.reviews} />
+                    </Box>
+
                     <Stack
                       direction="row"
                       sx={{ flexWrap: "wrap", gap: 0.5, mt: 1.5 }}

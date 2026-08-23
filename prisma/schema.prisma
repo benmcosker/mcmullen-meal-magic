@@ -24,7 +24,9 @@ model User {
   invitesSent        Invite[]            @relation("InviteSender")
   inviteUsed         Invite?             @relation("InviteRedeemer")
   shoppingRuns       ShoppingHandoff[]
-  skippedIngredients SkippedIngredient[]
+  pantryItems        PantryItem[]
+  weeklySkips        WeeklySkip[]
+  reviews            RecipeReview[]
 
   @@unique([email])
   @@map("user")
@@ -114,6 +116,14 @@ model Invite {
 // ---------------------------------------------------------------------------
 
 /// How a recipe got into the library. Extracted recipes carry their source PDF.
+/// Oven temperatures are stored in the unit the card printed them in.
+/// Converting on the way in would turn a clean 180C into 356F, and the cook
+/// reading the card wants to see the number they can dial.
+enum TemperatureUnit {
+  FAHRENHEIT
+  CELSIUS
+}
+
 enum RecipeSource {
   MANUAL
   PDF
@@ -127,10 +137,29 @@ model Recipe {
   prepMinutes  Int?
   cookMinutes  Int?
   sourceUrl    String?
+  /// Where it came from, by name: "Bon Appetit", "Nana's card". A URL is not
+  /// always available, and often the provenance is the point.
+  sourceName   String?
   /// Ordered preparation steps.
   instructions String[]     @default([])
   notes        String?
   source       RecipeSource @default(MANUAL)
+
+  /// Oven temperature as printed, with the unit it was printed in. Either both
+  /// are set or neither is - a number with no unit is not a temperature, and
+  /// the migration has a CHECK constraint saying so.
+  ovenTemp     Int?
+  ovenTempUnit TemperatureUnit?
+  /// Resting, chilling, marinating, proving. Kept apart from cook time because
+  /// it changes when you have to start, not how long you stand at the stove -
+  /// which is exactly what a weeknight plan needs to know.
+  restMinutes  Int?
+  /// "Makes 12 muffins", "Serves 4 as a main, 6 as a starter". The integer
+  /// servings drives the shopping maths; this says what the card said.
+  yieldNote    String?
+  /// "9x13 pan", "Dutch oven", "Stand mixer". Worth knowing before you start
+  /// rather than at step four.
+  equipment    String[]     @default([])
 
   /// Blob URLs. Both optional: the dish photo especially is best-effort, since
   /// not every PDF contains one.
@@ -152,6 +181,7 @@ model Recipe {
   ingredients  Ingredient[]
   tags         RecipeTag[]
   plannedMeals PlannedMeal[]
+  reviews      RecipeReview[]
 
   /// Maintained by a trigger (see the recipe_search migration), not by Prisma.
   /// Declared here only so migrations do not drop a column they cannot model.
@@ -211,6 +241,43 @@ model RecipeTag {
 // Weekly planning
 // ---------------------------------------------------------------------------
 
+/// One person's verdict on one recipe: a score, and optionally what they
+/// thought.
+///
+/// Stars and words are one record rather than two. A five-star score with no
+/// explanation is worth less than "five stars, but halve the chilli", and a
+/// note from someone who never said whether they liked the dish leaves the
+/// reader guessing. Tying them together means every opinion carries a score
+/// and every score can carry its reasoning.
+///
+/// One review per person per recipe, so the average reflects how many people
+/// liked a dish rather than how many times its keenest fan said so. Cooking it
+/// again and changing your mind edits the review you already left.
+model RecipeReview {
+  id    String @id @default(cuid())
+  /// Whole stars, 1 to 5. Required - a review with no score is a note, and the
+  /// range is enforced by a CHECK constraint in the migration as well as here,
+  /// because an average is only meaningful if nothing off the scale can reach
+  /// the column.
+  stars Int
+  /// What they thought. Optional, so rating a dish stays a two-second job for
+  /// anyone with nothing to add.
+  body  String?
+
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([recipeId, userId])
+  @@index([recipeId, createdAt])
+  @@index([userId])
+  @@map("recipe_review")
+}
+
 enum MealSlot {
   BREAKFAST
   LUNCH
@@ -240,51 +307,48 @@ model PlannedMeal {
 }
 
 /// How long an ingredient stays off the shopping list.
-enum SkipScope {
-  /// Just the week it was skipped in - "we already have milk this week".
-  WEEK
-  /// Every week. Pantry staples: salt, oil, flour. The things that pad a list
-  /// to forty lines and are never actually bought.
-  ALWAYS
-}
-
-/// An ingredient the household does not want on the shopping list.
+/// A staple the household always has in: salt, olive oil, flour.
 ///
-/// Stored as an exclusion rather than materialising the whole list, because
-/// the list is derived from the week's planned meals and changes whenever the
-/// plan does. Materialising it would mean reconciling a regenerated list
-/// against hand edits on every change; an exclusion needs no reconciliation -
-/// it just keeps suppressing a name.
-///
-/// Matching is on `normalisedName`, so "Olive Oil" and "olive oil" are the
-/// same staple.
-model SkippedIngredient {
-  id             String    @id @default(cuid())
-  /// As the household typed or saw it, for display.
+/// The point of the pantry is that these never reach a shopping list. Keeping
+/// them in their own table rather than as a flavour of "skip" means they can be
+/// managed as a list in their own right - added before they ever show up on a
+/// week's shopping, rather than only dismissed after they do.
+model PantryItem {
+  id             String   @id @default(cuid())
+  /// As typed, for display.
   name           String
-  /// Lower-cased and trimmed, for matching.
-  normalisedName String
-  scope          SkipScope
-  /// Set for WEEK scope, null for ALWAYS.
-  weekStart      DateTime? @db.Date
-  createdAt      DateTime  @default(now())
+  /// Lower-cased and trimmed, for matching against recipe ingredients. Unique
+  /// outright: a pantry with "Olive Oil" and "olive oil" in it is a bug.
+  normalisedName String   @unique
+  createdAt      DateTime @default(now())
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
-  /// One row per name per week, and one permanent row per name. Postgres treats
-  /// NULLs as distinct in a unique index, so the ALWAYS rows are constrained by
-  /// the partial index in the migration instead.
-  @@unique([normalisedName, weekStart])
   @@index([createdById])
-  @@map("skipped_ingredient")
+  @@map("pantry_item")
 }
 
-/// Where a week's shopping list was sent.
+/// "We already have milk, do not put it on this week's list."
 ///
-/// Only Instacart builds a real cart. Amazon has no public Fresh/Whole Foods
-/// ordering API, so those providers hand over deep links instead - see
-/// src/lib/shopping/amazon.ts.
+/// Distinct from the pantry: this expires. Next week milk is back on the list,
+/// which is what you want for something you ran out of rather than something
+/// you always keep.
+model WeeklySkip {
+  id             String   @id @default(cuid())
+  name           String
+  normalisedName String
+  weekStart      DateTime @db.Date
+  createdAt      DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([normalisedName, weekStart])
+  @@index([createdById])
+  @@map("weekly_skip")
+}
+
 enum ShoppingProvider {
   INSTACART
   AMAZON_FRESH

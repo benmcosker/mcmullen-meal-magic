@@ -94,8 +94,8 @@ export function aggregateIngredients(
       }[];
     } | null;
   }[],
-  /** Normalised names to leave off the list entirely. */
-  skipped: ReadonlySet<string> = new Set(),
+  /** What to leave off the list entirely. */
+  excluded: Exclusions = NOTHING_EXCLUDED,
 ): GroceryLine[] {
   const merged = new Map<string, GroceryLine>();
 
@@ -111,9 +111,9 @@ export function aggregateIngredients(
       const name = normaliseName(ingredient.name);
       if (!name) continue;
 
-      // Skipped before merging, so a staple contributed by three recipes
+      // Excluded before merging, so a staple contributed by three recipes
       // disappears once rather than leaving a merged line behind.
-      if (skipped.has(name)) continue;
+      if (excluded.has(name)) continue;
 
       const hasQuantity =
         ingredient.quantity != null && ingredient.quantity > 0;
@@ -185,33 +185,107 @@ export async function getWeekPlan(weekStart: Date) {
   });
 }
 
-export type SkipRecord = {
+export type WeeklySkipRecord = {
   id: string;
   name: string;
   normalisedName: string;
-  scope: "WEEK" | "ALWAYS";
 };
 
 /**
- * Everything hidden from a given week's list: permanent staples, plus anything
- * skipped for that week specifically.
+ * Ingredients marked "got it" for this week specifically.
+ *
+ * Pantry staples are not in here. They are a separate, permanent list, and
+ * folding the two together was what made "always have" reachable only by
+ * dismissing a row that had already appeared.
  */
-export async function getSkipsForWeek(weekStart: Date): Promise<SkipRecord[]> {
-  const rows = await prisma.skippedIngredient.findMany({
-    where: {
-      OR: [{ scope: "ALWAYS" }, { scope: "WEEK", weekStart }],
-    },
-    orderBy: [{ scope: "asc" }, { name: "asc" }],
+export async function getWeeklySkips(
+  weekStart: Date,
+): Promise<WeeklySkipRecord[]> {
+  return prisma.weeklySkip.findMany({
+    where: { weekStart },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, normalisedName: true },
   });
-
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    normalisedName: row.normalisedName,
-    scope: row.scope,
-  }));
 }
 
-export function toSkipSet(skips: SkipRecord[]): Set<string> {
-  return new Set(skips.map((s) => s.normalisedName));
+/** Decides whether a normalised ingredient name belongs on the list. */
+export type Exclusions = { has(normalisedName: string): boolean };
+
+export const NOTHING_EXCLUDED: Exclusions = { has: () => false };
+
+/**
+ * Everything to keep off this week's list: the permanent pantry, plus what has
+ * already been picked up this week.
+ *
+ * The two match differently, on purpose.
+ *
+ * A weekly skip matches exactly. You ticked off the line as it was printed, and
+ * that is all you meant.
+ *
+ * A pantry staple matches on the head of the phrase, in either direction,
+ * because the name in the cupboard and the name on the card are rarely the same
+ * words. "Coarse salt" in the pantry has to cover a recipe asking for "salt",
+ * and "olive oil" has to cover "extra virgin olive oil".
+ *
+ * Matching the head - the last word, which is what an English noun phrase is
+ * actually about - rather than any run of words is what keeps this honest.
+ * "Egg noodles" contains "egg" but is not eggs, and would have been quietly
+ * dropped from the list by a looser rule; its head is "noodles", so it stays.
+ * Likewise "granulated sugar" in the pantry does not hide "brown sugar", and
+ * "salt" does not swallow "salted butter".
+ */
+export function buildExclusions(
+  pantry: { normalisedName: string }[],
+  weeklySkips: { normalisedName: string }[],
+): Exclusions {
+  const exact = new Set(weeklySkips.map((skip) => skip.normalisedName));
+  const staples = pantry
+    .map((item) => words(item.normalisedName))
+    .filter((tokens) => tokens.length > 0);
+
+  return {
+    has(normalisedName: string): boolean {
+      if (exact.has(normalisedName)) return true;
+
+      const tokens = words(normalisedName);
+      if (tokens.length === 0) return false;
+
+      return staples.some(
+        (staple) => endsWith(tokens, staple) || endsWith(staple, tokens),
+      );
+    },
+  };
+}
+
+/**
+ * Split into comparable words.
+ *
+ * Trailing plurals are dropped so "eggs" in the pantry covers a recipe calling
+ * for an "egg". Both sides get the same treatment, so it does not matter that
+ * the rule is crude - only that it is applied consistently. Words ending in
+ * "ss" are left alone, or "glass" would become "glas".
+ */
+function words(value: string): string[] {
+  return value
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean)
+    .map((word) =>
+      word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
+        ? word.slice(0, -1)
+        : word,
+    );
+}
+
+/**
+ * Does `phrase` end with `suffix`?
+ *
+ * The head of an English noun phrase is its last word, so this asks whether the
+ * two names are about the same thing: "extra virgin olive oil" and "olive oil"
+ * are, "egg noodles" and "eggs" are not.
+ */
+function endsWith(phrase: string[], suffix: string[]): boolean {
+  if (suffix.length === 0 || suffix.length > phrase.length) return false;
+
+  const offset = phrase.length - suffix.length;
+  return suffix.every((word, index) => phrase[offset + index] === word);
 }

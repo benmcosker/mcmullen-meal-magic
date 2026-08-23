@@ -4,10 +4,16 @@ import RestaurantIcon from "@mui/icons-material/Restaurant";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
+import type { ReviewSummary } from "@/lib/review-schema";
+
+import { ReviewStars } from "./ReviewStars";
+
 export type TileRecipe = {
   id: string;
   title: string;
   imageUrl: string | null;
+  /** Optional so a tile can be shown before review scores have been loaded. */
+  reviews?: ReviewSummary;
 };
 
 /**
@@ -70,6 +76,17 @@ export function RecipeTile({
       >
         {recipe.title}
       </Typography>
+
+      {/*
+       * The count is left off here. A tile is narrow, and when you are picking
+       * what to cook the score is the useful half - the sample size is one
+       * click away on the recipe itself.
+       */}
+      {recipe.reviews ? (
+        <Box sx={{ mt: 0.25 }}>
+          <ReviewStars summary={recipe.reviews} showCount={false} />
+        </Box>
+      ) : null}
     </Box>
   );
 }

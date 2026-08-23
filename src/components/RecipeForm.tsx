@@ -10,12 +10,13 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
+import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState, type FormEvent } from "react";
 
-import type { RecipeInput } from "@/lib/recipe-schema";
+import { TEMPERATURE_UNITS, type RecipeInput } from "@/lib/recipe-schema";
 
 export type RecipeFormValues = RecipeInput;
 
@@ -52,7 +53,20 @@ export function RecipeForm({
   const [cookMinutes, setCookMinutes] = useState(
     initial.cookMinutes == null ? "" : String(initial.cookMinutes),
   );
+  const [restMinutes, setRestMinutes] = useState(
+    initial.restMinutes == null ? "" : String(initial.restMinutes),
+  );
+  const [ovenTemp, setOvenTemp] = useState(
+    initial.ovenTemp == null ? "" : String(initial.ovenTemp),
+  );
+  const [ovenTempUnit, setOvenTempUnit] = useState(
+    initial.ovenTempUnit ?? "FAHRENHEIT",
+  );
+  const [yieldNote, setYieldNote] = useState(initial.yieldNote ?? "");
+  const [equipment, setEquipment] = useState<string[]>(initial.equipment);
+  const [equipmentDraft, setEquipmentDraft] = useState("");
   const [sourceUrl, setSourceUrl] = useState(initial.sourceUrl ?? "");
+  const [sourceName, setSourceName] = useState(initial.sourceName ?? "");
   const [notes, setNotes] = useState(initial.notes ?? "");
   const [rows, setRows] = useState<Row[]>(toRows(initial.ingredients));
   const [steps, setSteps] = useState<string[]>(
@@ -62,6 +76,15 @@ export function RecipeForm({
   const [tagDraft, setTagDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  function addEquipment() {
+    const value = equipmentDraft.trim();
+    if (!value) return;
+    if (!equipment.some((e) => e.toLowerCase() === value.toLowerCase())) {
+      setEquipment([...equipment, value]);
+    }
+    setEquipmentDraft("");
+  }
 
   function addTag() {
     const value = tagDraft.trim();
@@ -83,7 +106,15 @@ export function RecipeForm({
       servings: Number(servings) || 4,
       prepMinutes: prepMinutes === "" ? null : Number(prepMinutes),
       cookMinutes: cookMinutes === "" ? null : Number(cookMinutes),
+      restMinutes: restMinutes === "" ? null : Number(restMinutes),
+      // The unit only means something with a number beside it, so an empty
+      // temperature clears both rather than leaving a stray unit behind.
+      ovenTemp: ovenTemp === "" ? null : Number(ovenTemp),
+      ovenTempUnit: ovenTemp === "" ? null : ovenTempUnit,
+      yieldNote: yieldNote || null,
+      equipment,
       sourceUrl: sourceUrl || null,
+      sourceName: sourceName || null,
       notes: notes || null,
       instructions: steps.map((s) => s.trim()).filter(Boolean),
       ingredients: rows
@@ -156,6 +187,65 @@ export function RecipeForm({
               </Grid>
               <Grid size={{ xs: 6, sm: 3 }}>
                 <TextField
+                  label="Rest / chill (min)"
+                  type="number"
+                  value={restMinutes}
+                  onChange={(e) => setRestMinutes(e.target.value)}
+                  helperText="Resting, marinating, proving"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <TextField
+                  label="Oven temp"
+                  type="number"
+                  value={ovenTemp}
+                  onChange={(e) => setOvenTemp(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <TextField
+                  select
+                  label="Unit"
+                  value={ovenTempUnit}
+                  onChange={(e) =>
+                    setOvenTempUnit(
+                      e.target.value as (typeof TEMPERATURE_UNITS)[number],
+                    )
+                  }
+                  // Meaningless on its own, so it stays out of the way until
+                  // there is a number for it to describe.
+                  disabled={ovenTemp === ""}
+                  fullWidth
+                >
+                  {TEMPERATURE_UNITS.map((unit) => (
+                    <MenuItem key={unit} value={unit}>
+                      {unit === "FAHRENHEIT" ? "°F" : "°C"}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Yield"
+                  value={yieldNote}
+                  onChange={(e) => setYieldNote(e.target.value)}
+                  placeholder="Makes 12 muffins"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Source name"
+                  value={sourceName}
+                  onChange={(e) => setSourceName(e.target.value)}
+                  placeholder="Bon Appetit"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
                   label="Source URL"
                   value={sourceUrl}
                   onChange={(e) => setSourceUrl(e.target.value)}
@@ -163,6 +253,46 @@ export function RecipeForm({
                 />
               </Grid>
             </Grid>
+
+            <Box>
+              <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                <TextField
+                  label="Equipment"
+                  value={equipmentDraft}
+                  onChange={(e) => setEquipmentDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      // Otherwise Enter submits the whole recipe while someone
+                      // is still adding pans.
+                      e.preventDefault();
+                      addEquipment();
+                    }
+                  }}
+                  placeholder="9x13 baking dish"
+                  size="small"
+                  fullWidth
+                />
+                <Button
+                  aria-label="Add equipment"
+                  onClick={addEquipment}
+                  disabled={!equipmentDraft.trim()}
+                >
+                  Add
+                </Button>
+              </Stack>
+              <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                {equipment.map((item) => (
+                  <Chip
+                    key={item}
+                    label={item}
+                    size="small"
+                    onDelete={() =>
+                      setEquipment(equipment.filter((e) => e !== item))
+                    }
+                  />
+                ))}
+              </Stack>
+            </Box>
           </Stack>
         </CardContent>
       </Card>
@@ -246,6 +376,13 @@ export function RecipeForm({
                   {index + 1}.
                 </Typography>
                 <TextField
+                  // The visible "1." beside it is a Typography, not a label,
+                  // so without this a screen reader reaches an unnamed box.
+                  // It has to go through slotProps: TextField spreads unknown
+                  // props onto the wrapper, where aria-label does nothing.
+                  slotProps={{
+                    htmlInput: { "aria-label": `Step ${index + 1}` },
+                  }}
                   value={step}
                   onChange={(e) =>
                     setSteps(
@@ -311,7 +448,9 @@ export function RecipeForm({
                 }
               }}
             />
-            <Button onClick={addTag}>Add</Button>
+            <Button aria-label="Add tag" onClick={addTag}>
+              Add
+            </Button>
           </Stack>
         </CardContent>
       </Card>

@@ -28,7 +28,13 @@ export default async function EditRecipePage({
           servings: recipe.servings,
           prepMinutes: recipe.prepMinutes,
           cookMinutes: recipe.cookMinutes,
+          restMinutes: recipe.restMinutes,
+          ovenTemp: recipe.ovenTemp,
+          ovenTempUnit: recipe.ovenTempUnit,
+          yieldNote: recipe.yieldNote,
+          equipment: recipe.equipment,
           sourceUrl: recipe.sourceUrl,
+          sourceName: recipe.sourceName,
           notes: recipe.notes,
           instructions: recipe.instructions,
           ingredients: recipe.ingredients.map((i) => ({
