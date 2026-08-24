@@ -39,12 +39,47 @@ need changing, because `package.json` defines a `vercel-build` script that
 Vercel prefers automatically:
 
 ```
-prisma migrate deploy && next build
+node scripts/migrate-on-deploy.mjs && next build
 ```
 
 That runs pending migrations against `DIRECT_DATABASE_URL` before building, so
 a deploy that changes the schema applies it rather than booting against the old
-one.
+one — but **only for production deployments**.
+
+### Why previews do not migrate
+
+Preview deployments share the production database unless you have given them
+one of their own. That is a worse arrangement than it sounds. A preview builds
+from a branch, so it applies whatever a migration looks like _at that moment_,
+and Prisma records a migration by name: if the migration is then rewritten
+before it merges, the corrected version never runs. Production is left carrying
+a schema that no commit in the repository describes.
+
+This is not hypothetical. It happened here — a preview applied the households
+migration twenty-two minutes before its pull request merged, the migration
+having been rewritten in between. The column it added was missing in
+production, the household page still rendered because listing invites does not
+select that column, and creating one failed with a bare Next.js error digest.
+
+So previews skip migrations, and the build says so in its log rather than
+leaving you to infer it.
+
+### Giving previews their own database
+
+The better arrangement, and the one that lets previews test their own
+migrations. In the Neon integration on Vercel, enable a database branch per
+preview deployment; Neon branches copy schema and data, and are disposable.
+
+Once previews have their own database, let them migrate it: set
+
+```
+PREVIEW_DATABASE_IS_DISPOSABLE=true
+```
+
+on the **Preview** environment only. It is a variable rather than a code change
+because it is a fact about how the databases are wired, and it belongs in the
+same place as the connection strings — set by whoever knows which database a
+preview is actually pointed at.
 
 ## 4. Environment variables
 
@@ -88,11 +123,12 @@ It runs a real query rather than returning a bare 200, because the failures
 worth catching all look like a healthy app until something touches the
 database. The three states it distinguishes:
 
-| Response                           | Meaning                             | Fix                                                         |
-| ---------------------------------- | ----------------------------------- | ----------------------------------------------------------- |
-| `reachable: false`                 | Wrong or unreachable `DATABASE_URL` | Check the pooled string and Neon's IP rules                 |
-| `reachable: true, migrated: false` | Connected, schema never created     | The `vercel-build` script did not run — check the build log |
-| `status: ok`                       | Working                             | —                                                           |
+| Response                           | Meaning                             | Fix                                                                                                                                                            |
+| ---------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reachable: false`                 | Wrong or unreachable `DATABASE_URL` | Check the pooled string and Neon's IP rules                                                                                                                    |
+| `reachable: true, migrated: false` | Connected, schema never created     | The `vercel-build` script did not run — check the build log                                                                                                    |
+| `status: "read-only"`              | Reads work, every write is refused  | `reason` says which: a read replica means `DATABASE_URL` points at the wrong endpoint; read-only mode is usually the provider, over a limit or mid-maintenance |
+| `status: ok`                       | Working                             | —                                                                                                                                                              |
 
 `disabledFeatures` lists any optional integration that is off, so you can tell
 a deliberate omission from a typo in a key name.
