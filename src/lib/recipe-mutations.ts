@@ -18,6 +18,7 @@ type RecipeAssets = {
 
 export async function createRecipe(
   input: RecipeInput,
+  householdId: string,
   createdById: string,
   assets: RecipeAssets = {},
 ): Promise<string> {
@@ -44,6 +45,7 @@ export async function createRecipe(
       pdfFilename: assets.pdfFilename ?? null,
       pdfSha256: assets.pdfSha256 ?? null,
       imageUrl: assets.imageUrl ?? null,
+      householdId,
       createdById,
       ingredients: {
         create: input.ingredients.map((ingredient, position) => ({
@@ -62,23 +64,34 @@ export async function createRecipe(
 }
 
 /**
- * Replace a recipe's contents.
+ * Replace a recipe's contents. Returns false if it is not this household's.
  *
  * Ingredients and tags are deleted and recreated rather than diffed: the lists
  * are short, ordering matters, and a diff would have to reconcile renames it
  * has no stable identity for. Wrapped in a transaction so a failure part-way
  * cannot leave a recipe with no ingredients.
+ *
+ * The ownership check runs inside that transaction rather than before it. A
+ * check outside would be a window, however small, in which the recipe could
+ * change hands between the answer and the write.
  */
 export async function updateRecipe(
   id: string,
+  householdId: string,
   input: RecipeInput,
-): Promise<void> {
+): Promise<boolean> {
   const tagIds = await upsertTags(input.tags);
 
-  await prisma.$transaction([
-    prisma.ingredient.deleteMany({ where: { recipeId: id } }),
-    prisma.recipeTag.deleteMany({ where: { recipeId: id } }),
-    prisma.recipe.update({
+  return prisma.$transaction(async (tx) => {
+    const owned = await tx.recipe.findFirst({
+      where: { id, householdId },
+      select: { id: true },
+    });
+    if (!owned) return false;
+
+    await tx.ingredient.deleteMany({ where: { recipeId: id } });
+    await tx.recipeTag.deleteMany({ where: { recipeId: id } });
+    await tx.recipe.update({
       where: { id },
       data: {
         title: input.title,
@@ -106,20 +119,45 @@ export async function updateRecipe(
         },
         tags: { create: tagIds.map((tagId) => ({ tagId })) },
       },
-    }),
-  ]);
+    });
+
+    return true;
+  });
 }
 
-export async function deleteRecipe(id: string): Promise<void> {
-  await prisma.recipe.delete({ where: { id } });
+/**
+ * Remove a recipe, if it belongs to this household. Returns whether it did.
+ *
+ * `deleteMany` rather than `delete` so an id belonging to another family
+ * matches nothing instead of erroring - the same answer as an id that was
+ * already gone, and one that says nothing about what exists elsewhere.
+ */
+export async function deleteRecipe(
+  id: string,
+  householdId: string,
+): Promise<boolean> {
+  const { count } = await prisma.recipe.deleteMany({
+    where: { id, householdId },
+  });
+  return count > 0;
 }
 
-/** Tags with a usage count, for the filter bar. */
-export async function listTagsWithCounts(): Promise<
-  { id: string; name: string; slug: string; count: number }[]
-> {
+/**
+ * Tags with a usage count, for the filter bar.
+ *
+ * Tag rows themselves stay a shared vocabulary - "Sheet Pan" means the same
+ * thing in every kitchen, and a per-household copy of the word buys nothing.
+ * The counts are what must be scoped: they are the only part that would
+ * otherwise describe another family's library, and a tag used by nobody here
+ * drops off the bar entirely.
+ */
+export async function listTagsWithCounts(
+  householdId: string,
+): Promise<{ id: string; name: string; slug: string; count: number }[]> {
   const tags = await prisma.tag.findMany({
-    include: { _count: { select: { recipes: true } } },
+    include: {
+      _count: { select: { recipes: { where: { recipe: { householdId } } } } },
+    },
     orderBy: { name: "asc" },
   });
 

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { createRecipe } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
-import { requireUser } from "@/lib/session";
+import { requireHousehold, requireUser } from "@/lib/session";
 import { deleteFile } from "@/lib/storage";
 
 export type SaveExtractedResult = { ok: false; error: string };
@@ -25,7 +25,7 @@ export async function saveExtractedRecipeAction(
     imageUrl?: string | null;
   },
 ): Promise<SaveExtractedResult> {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const parsed = recipeInput.safeParse(raw);
   if (!parsed.success) {
@@ -35,7 +35,7 @@ export async function saveExtractedRecipeAction(
     };
   }
 
-  const id = await createRecipe(parsed.data, user.id, {
+  const id = await createRecipe(parsed.data, user.householdId, user.id, {
     source: "PDF",
     pdfUrl: assets.pdfUrl ?? null,
     pdfFilename: assets.pdfFilename ?? null,

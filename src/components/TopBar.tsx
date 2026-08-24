@@ -17,6 +17,7 @@ const navItems = [
   { href: "/plan", label: "This week" },
   { href: "/pantry", label: "Pantry" },
   { href: "/upload", label: "Upload" },
+  { href: "/household", label: "Household" },
 ] as const;
 
 /**
@@ -46,13 +47,28 @@ export function TopBar({ userName }: { userName: string | null }) {
         </Typography>
 
         {userName ? (
-          <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              flexGrow: 1,
+              // Five destinations do not fit across a phone. Scrolling the row
+              // keeps the bar one line tall, where wrapping would spend a
+              // second line of every screen on navigation. The scrollbar is
+              // hidden because the cut-off item is the affordance.
+              minWidth: 0,
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
             {navItems.map((item) => (
               <Button
                 key={item.href}
                 component={Link}
                 href={item.href}
                 color="inherit"
+                sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
               >
                 {item.label}
               </Button>

@@ -8,6 +8,8 @@ import { clearRecipeImage, setRecipeImage } from "@/lib/recipe-image";
 import { createRecipe } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
 
+import { makeHousehold, resetDatabase as reset } from "./support/db";
+
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 /** The local driver writes here when no blob token is configured. */
@@ -19,20 +21,12 @@ const photo = () =>
 
 describe.skipIf(!hasDb)("a recipe's photo", () => {
   let userId: string;
+  let householdId: string;
   let recipeId: string;
 
   beforeEach(async () => {
     await reset();
-    const user = await prisma.user.create({
-      data: {
-        id: "photo-user",
-        name: "Cook",
-        email: "photo@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
-    userId = user.id;
+    ({ householdId, userId } = await makeHousehold());
     recipeId = await createRecipe(
       recipeInput.parse({
         title: "Chicken Piccata",
@@ -40,6 +34,7 @@ describe.skipIf(!hasDb)("a recipe's photo", () => {
         ingredients: [],
         tags: [],
       }),
+      householdId,
       userId,
     );
   });
@@ -60,6 +55,7 @@ describe.skipIf(!hasDb)("a recipe's photo", () => {
   it("stores the file and points the recipe at it", async () => {
     const url = await setRecipeImage(
       recipeId,
+      householdId,
       photo(),
       "photo.jpg",
       "image/jpeg",
@@ -72,12 +68,14 @@ describe.skipIf(!hasDb)("a recipe's photo", () => {
   it("keeps one image per recipe, replacing rather than accumulating", async () => {
     const first = await setRecipeImage(
       recipeId,
+      householdId,
       photo(),
       "photo.jpg",
       "image/jpeg",
     );
     const second = await setRecipeImage(
       recipeId,
+      householdId,
       photo(),
       "photo.jpg",
       "image/jpeg",
@@ -92,38 +90,54 @@ describe.skipIf(!hasDb)("a recipe's photo", () => {
     // references and nothing will ever find again.
     const first = await setRecipeImage(
       recipeId,
+      householdId,
       photo(),
       "photo.jpg",
       "image/jpeg",
     );
     expect(existsSync(onDisk(first))).toBe(true);
 
-    await setRecipeImage(recipeId, photo(), "photo.jpg", "image/jpeg");
+    await setRecipeImage(
+      recipeId,
+      householdId,
+      photo(),
+      "photo.jpg",
+      "image/jpeg",
+    );
     expect(existsSync(onDisk(first))).toBe(false);
   });
 
   it("removes the photo and its file", async () => {
     const url = await setRecipeImage(
       recipeId,
+      householdId,
       photo(),
       "photo.jpg",
       "image/jpeg",
     );
-    await clearRecipeImage(recipeId);
+    await clearRecipeImage(recipeId, householdId);
 
     expect(await imageUrl()).toBeNull();
     expect(existsSync(onDisk(url))).toBe(false);
   });
 
   it("treats removing a photo that is not there as a no-op", async () => {
-    await expect(clearRecipeImage(recipeId)).resolves.toBeUndefined();
+    await expect(
+      clearRecipeImage(recipeId, householdId),
+    ).resolves.toBeUndefined();
     expect(await imageUrl()).toBeNull();
   });
 
   it("refuses to attach a photo to a recipe that does not exist", async () => {
     // Better a clear failure than a stored file nothing will ever point at.
     await expect(
-      setRecipeImage("no-such-recipe", photo(), "photo.jpg", "image/jpeg"),
+      setRecipeImage(
+        "no-such-recipe",
+        householdId,
+        photo(),
+        "photo.jpg",
+        "image/jpeg",
+      ),
     ).rejects.toThrow(/No such recipe/);
   });
 
@@ -135,16 +149,24 @@ describe.skipIf(!hasDb)("a recipe's photo", () => {
         ingredients: [],
         tags: [],
       }),
+      householdId,
       userId,
     );
     const otherUrl = await setRecipeImage(
       other,
+      householdId,
       photo(),
       "photo.jpg",
       "image/jpeg",
     );
-    await setRecipeImage(recipeId, photo(), "photo.jpg", "image/jpeg");
-    await clearRecipeImage(recipeId);
+    await setRecipeImage(
+      recipeId,
+      householdId,
+      photo(),
+      "photo.jpg",
+      "image/jpeg",
+    );
+    await clearRecipeImage(recipeId, householdId);
 
     const otherRecipe = await prisma.recipe.findUnique({
       where: { id: other },
@@ -153,19 +175,3 @@ describe.skipIf(!hasDb)("a recipe's photo", () => {
     expect(existsSync(onDisk(otherUrl))).toBe(true);
   });
 });
-
-async function reset() {
-  await prisma.pantryItem.deleteMany();
-  await prisma.weeklySkip.deleteMany();
-  await prisma.recipeReview.deleteMany();
-  await prisma.recipeTag.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.plannedMeal.deleteMany();
-  await prisma.shoppingHandoff.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
-}

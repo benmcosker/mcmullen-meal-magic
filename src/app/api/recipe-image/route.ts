@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { inspectImage } from "@/lib/image-inspect";
 import { clearRecipeImage, setRecipeImage } from "@/lib/recipe-image";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentHousehold } from "@/lib/session";
 
 /**
  * A photo is small next to a PDF and needs no model call, but it still crosses
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 async function handle(request: Request) {
   // Every recipe is shared, so any signed-in member of the household can put a
   // photo on any of them - the same rule as editing.
-  const user = await getCurrentUser();
+  const user = await getCurrentHousehold();
   if (!user) {
     return NextResponse.json({ error: "Sign in to upload." }, { status: 401 });
   }
@@ -61,7 +61,7 @@ async function handle(request: Request) {
   // Removal comes through the same endpoint, so the client never has to decide
   // which one it is calling.
   if (formData.get("remove") === "true") {
-    await clearRecipeImage(recipeId);
+    await clearRecipeImage(recipeId, user.householdId);
     return NextResponse.json({ imageUrl: null });
   }
 
@@ -78,6 +78,7 @@ async function handle(request: Request) {
 
   const imageUrl = await setRecipeImage(
     recipeId,
+    user.householdId,
     bytes,
     `photo.${inspection.extension}`,
     inspection.contentType,

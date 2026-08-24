@@ -4,8 +4,10 @@ import { prisma } from "@/lib/db";
 import { DEFAULT_SORT, parseSort } from "@/lib/recipe-sort";
 import { createRecipe } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
-import { searchRecipes } from "@/lib/recipes";
+import { searchRecipes, type RecipeSearchOptions } from "@/lib/recipes";
 import { saveReview } from "@/lib/reviews";
+
+import { makeHousehold, resetDatabase as reset } from "./support/db";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -26,25 +28,17 @@ describe("parseSort", () => {
 
 describe.skipIf(!hasDb)("ordering the library", () => {
   let userId: string;
+  let householdId: string;
   let ids: Record<string, string>;
 
   beforeEach(async () => {
     await reset();
-    const user = await prisma.user.create({
-      data: {
-        id: "sort-user",
-        name: "Cook",
-        email: "sort@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
-    userId = user.id;
+    ({ householdId, userId } = await makeHousehold());
 
     // Added in a deliberate order, with titles that do not match it.
     ids = {};
     for (const title of ["Zabaglione", "apple crumble", "Mushroom Risotto"]) {
-      ids[title] = await add(title, userId);
+      ids[title] = await add(title, householdId, userId);
     }
   });
 
@@ -53,14 +47,17 @@ describe.skipIf(!hasDb)("ordering the library", () => {
     await prisma.$disconnect();
   });
 
-  const titles = async (options = {}) =>
-    (await searchRecipes(options)).map((r) => r.title);
+  const titles = async (options: Partial<RecipeSearchOptions> = {}) =>
+    (await searchRecipes({ householdId, ...options })).map((r) => r.title);
 
   /** One review per star given, each from a different person. */
   async function rate(title: string, stars: number[]) {
     for (const [index, value] of stars.entries()) {
       const id = await reviewer(`${title}-${index}`);
-      await saveReview(ids[title], id, { stars: value, body: null });
+      await saveReview(ids[title], householdId, id, {
+        stars: value,
+        body: null,
+      });
     }
   }
 
@@ -73,6 +70,7 @@ describe.skipIf(!hasDb)("ordering the library", () => {
         email: `${id}@example.com`,
         emailVerified: true,
         updatedAt: new Date(),
+        householdId,
       },
     });
     return id;
@@ -178,8 +176,14 @@ describe.skipIf(!hasDb)("ordering the library", () => {
       // saveReview upserts, so cooking it again and thinking better of it
       // moves the average rather than adding a second vote.
       const cook = await reviewer("second-thoughts");
-      await saveReview(ids["Zabaglione"], cook, { stars: 1, body: null });
-      await saveReview(ids["Zabaglione"], cook, { stars: 5, body: null });
+      await saveReview(ids["Zabaglione"], householdId, cook, {
+        stars: 1,
+        body: null,
+      });
+      await saveReview(ids["Zabaglione"], householdId, cook, {
+        stars: 5,
+        body: null,
+      });
       await rate("apple crumble", [3]);
 
       expect(await titles({ sort: "rating" })).toEqual([
@@ -190,8 +194,8 @@ describe.skipIf(!hasDb)("ordering the library", () => {
     });
 
     it("outranks relevance when a search is running", async () => {
-      ids["Lemon Chicken"] = await add("Lemon Chicken", userId);
-      ids["Chicken Soup"] = await add("Chicken Soup", userId);
+      ids["Lemon Chicken"] = await add("Lemon Chicken", householdId, userId);
+      ids["Chicken Soup"] = await add("Chicken Soup", householdId, userId);
       await rate("Chicken Soup", [5]);
       await rate("Lemon Chicken", [2]);
 
@@ -204,8 +208,8 @@ describe.skipIf(!hasDb)("ordering the library", () => {
 
   describe("alongside a search", () => {
     beforeEach(async () => {
-      await add("Lemon Chicken", userId);
-      await add("Chicken Soup", userId);
+      await add("Lemon Chicken", householdId, userId);
+      await add("Chicken Soup", householdId, userId);
     });
 
     it("still finds only what matches", async () => {
@@ -231,6 +235,7 @@ describe.skipIf(!hasDb)("ordering the library", () => {
           ingredients: [],
           tags: ["Weeknight"],
         }),
+        householdId,
         userId,
       );
       expect(tagged).toBeTruthy();
@@ -244,7 +249,11 @@ describe.skipIf(!hasDb)("ordering the library", () => {
   });
 });
 
-async function add(title: string, userId: string): Promise<string> {
+async function add(
+  title: string,
+  householdId: string,
+  userId: string,
+): Promise<string> {
   const id = await createRecipe(
     recipeInput.parse({
       title,
@@ -252,26 +261,11 @@ async function add(title: string, userId: string): Promise<string> {
       ingredients: [],
       tags: [],
     }),
+    householdId,
     userId,
   );
   // createdAt defaults to now(); without a gap the ordering of same-millisecond
   // rows is undefined and the test would be flaky rather than wrong.
   await new Promise((resolve) => setTimeout(resolve, 15));
   return id;
-}
-
-async function reset() {
-  await prisma.pantryItem.deleteMany();
-  await prisma.weeklySkip.deleteMany();
-  await prisma.recipeReview.deleteMany();
-  await prisma.recipeTag.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.plannedMeal.deleteMany();
-  await prisma.shoppingHandoff.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
 }

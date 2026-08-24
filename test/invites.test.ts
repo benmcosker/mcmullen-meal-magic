@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createInvite, generateInviteCode } from "@/lib/invites";
 
+import { makeHousehold, resetDatabase as reset } from "./support/db";
+
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const PASSWORD = "correct-horse-battery-staple";
@@ -47,19 +49,11 @@ async function signUpStatus(params: {
 
 describe.skipIf(!hasDb)("invite-gated signup", () => {
   let inviterId: string;
+  let householdId: string;
 
   beforeEach(async () => {
     await reset();
-    const inviter = await prisma.user.create({
-      data: {
-        name: "Inviter",
-        email: "inviter@example.com",
-        emailVerified: true,
-        id: "inviter",
-        updatedAt: new Date(),
-      },
-    });
-    inviterId = inviter.id;
+    ({ householdId, userId: inviterId } = await makeHousehold("The Inviters"));
   });
 
   afterAll(async () => {
@@ -83,7 +77,10 @@ describe.skipIf(!hasDb)("invite-gated signup", () => {
   });
 
   it("accepts signup with a valid invite and marks it redeemed", async () => {
-    const { code } = await createInvite({ createdById: inviterId });
+    const { code } = await createInvite({
+      createdById: inviterId,
+      householdId,
+    });
 
     const status = await signUpStatus({
       email: "invited@example.com",
@@ -98,7 +95,10 @@ describe.skipIf(!hasDb)("invite-gated signup", () => {
   });
 
   it("refuses to let one invite create a second account", async () => {
-    const { code } = await createInvite({ createdById: inviterId });
+    const { code } = await createInvite({
+      createdById: inviterId,
+      householdId,
+    });
 
     const first = await signUpStatus({
       email: "first@example.com",
@@ -117,7 +117,10 @@ describe.skipIf(!hasDb)("invite-gated signup", () => {
   });
 
   it("refuses an expired invite", async () => {
-    const { code } = await createInvite({ createdById: inviterId });
+    const { code } = await createInvite({
+      createdById: inviterId,
+      householdId,
+    });
     await prisma.invite.update({
       where: { code },
       data: { expiresAt: new Date(Date.now() - 1000) },
@@ -134,6 +137,7 @@ describe.skipIf(!hasDb)("invite-gated signup", () => {
   it("refuses an email-pinned invite redeemed from another address", async () => {
     const { code } = await createInvite({
       createdById: inviterId,
+      householdId,
       email: "intended@example.com",
     });
 
@@ -153,7 +157,10 @@ describe.skipIf(!hasDb)("invite-gated signup", () => {
   });
 
   it("accepts the code in lower case and with surrounding whitespace", async () => {
-    const { code } = await createInvite({ createdById: inviterId });
+    const { code } = await createInvite({
+      createdById: inviterId,
+      householdId,
+    });
 
     const status = await signUpStatus({
       email: "sloppy@example.com",
@@ -163,7 +170,10 @@ describe.skipIf(!hasDb)("invite-gated signup", () => {
   });
 
   it("survives two signups racing the same invite", async () => {
-    const { code } = await createInvite({ createdById: inviterId });
+    const { code } = await createInvite({
+      createdById: inviterId,
+      householdId,
+    });
 
     const statuses = await Promise.all([
       signUpStatus({ email: "racer-a@example.com", inviteCode: code }),
@@ -192,11 +202,4 @@ describe("generateInviteCode", () => {
 
 async function userCount(email: string): Promise<number> {
   return prisma.user.count({ where: { email: email.toLowerCase() } });
-}
-
-async function reset() {
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
 }

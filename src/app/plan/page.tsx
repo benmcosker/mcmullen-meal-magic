@@ -15,10 +15,10 @@ import { listPantryItems } from "@/lib/pantry";
 import { NO_REVIEWS } from "@/lib/review-schema";
 import { getReviewSummaries } from "@/lib/reviews";
 import { listUsableProviders } from "@/lib/shopping";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
-  await requireUser();
+  const { householdId } = await requireHousehold();
 
   const params = await searchParams;
   const weekParam = typeof params.week === "string" ? params.week : null;
@@ -27,13 +27,14 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   );
 
   const [meals, recipes, skips, pantry] = await Promise.all([
-    getWeekPlan(weekStart),
+    getWeekPlan(weekStart, householdId),
     prisma.recipe.findMany({
+      where: { householdId },
       select: { id: true, title: true, servings: true, imageUrl: true },
       orderBy: { title: "asc" },
     }),
-    getWeeklySkips(weekStart),
-    listPantryItems(),
+    getWeeklySkips(weekStart, householdId),
+    listPantryItems(householdId),
   ]);
 
   // Review scores on the picker tiles: choosing dinner is exactly when it helps

@@ -18,7 +18,7 @@ import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
 import { parseSort } from "@/lib/recipe-sort";
 import { searchRecipes } from "@/lib/recipes";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 /** Enough to characterise a dish; more than this and the card is all labels. */
 const MAX_TAGS_ON_CARD = 3;
@@ -26,7 +26,7 @@ const MAX_TAGS_ON_CARD = 3;
 export default async function RecipesPage({
   searchParams,
 }: PageProps<"/recipes">) {
-  await requireUser();
+  const { householdId } = await requireHousehold();
 
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
@@ -40,8 +40,8 @@ export default async function RecipesPage({
   const sort = parseSort(params.sort);
 
   const [recipes, tags] = await Promise.all([
-    searchRecipes({ query, tagSlugs, sort }),
-    listTagsWithCounts(),
+    searchRecipes({ householdId, query, tagSlugs, sort }),
+    listTagsWithCounts(householdId),
   ]);
 
   return (

@@ -21,7 +21,7 @@ import { ReviewStars } from "@/components/ReviewStars";
 import { getMyReview, listReviews } from "@/lib/reviews";
 import { formatMinutes, formatOvenTemp } from "@/lib/temperature";
 import { getRecipe } from "@/lib/recipes";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 function formatQuantity(quantity: number | null, unit: string | null): string {
   // No rounding: String already gives "2" for 2.0 and keeps 0.25 intact.
@@ -32,10 +32,10 @@ function formatQuantity(quantity: number | null, unit: string | null): string {
 export default async function RecipePage({
   params,
 }: PageProps<"/recipes/[id]">) {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const { id } = await params;
-  const recipe = await getRecipe(id);
+  const recipe = await getRecipe(id, user.householdId);
   if (!recipe) notFound();
 
   const [reviews, myReview] = await Promise.all([

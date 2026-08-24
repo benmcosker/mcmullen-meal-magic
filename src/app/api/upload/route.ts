@@ -10,7 +10,7 @@ import { extractRecipeFromPdf } from "@/lib/extract-recipe";
 import { extractLargestJpeg } from "@/lib/pdf-images";
 import { inspectPdf } from "@/lib/pdf-inspect";
 import { blobStoreId, storeFile } from "@/lib/storage";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentHousehold } from "@/lib/session";
 
 /**
  * Reading a PDF takes as long as it takes.
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 async function handleUpload(request: Request) {
   // Upload is restricted to signed-in users. This is the enforcement point;
   // hiding the nav link is not.
-  const user = await getCurrentUser();
+  const user = await getCurrentHousehold();
   if (!user) {
     return NextResponse.json({ error: "Sign in to upload." }, { status: 401 });
   }
@@ -117,7 +117,7 @@ async function handleUpload(request: Request) {
   // difference between an instant answer and a slow, billable call whose
   // result gets thrown away.
   const pdfSha256 = hashBytes(bytes);
-  const alreadyHave = await findRecipeByPdfHash(pdfSha256);
+  const alreadyHave = await findRecipeByPdfHash(pdfSha256, user.householdId);
   if (alreadyHave) {
     return NextResponse.json(
       {
@@ -149,7 +149,10 @@ async function handleUpload(request: Request) {
   // A different PDF of a dish already in the library shares no bytes with it,
   // so only the title gives it away. Reported alongside the extraction as a
   // warning: the review screen can show it, and the person decides.
-  const similar = await findSimilarlyTitled(extraction.recipe.title);
+  const similar = await findSimilarlyTitled(
+    extraction.recipe.title,
+    user.householdId,
+  );
 
   return NextResponse.json({
     recipe: extraction.recipe,

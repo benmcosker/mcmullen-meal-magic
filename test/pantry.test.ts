@@ -8,6 +8,8 @@ import {
 } from "@/lib/grocery";
 import { addPantryItem, listPantryItems, removePantryItem } from "@/lib/pantry";
 
+import { makeHousehold, makeUser, resetDatabase as reset } from "./support/db";
+
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe("buildExclusions", () => {
@@ -142,19 +144,11 @@ describe("a pantry staple never reaches the list", () => {
 
 describe.skipIf(!hasDb)("the pantry list", () => {
   let userId: string;
+  let householdId: string;
 
   beforeEach(async () => {
     await reset();
-    const user = await prisma.user.create({
-      data: {
-        id: "pantry-user",
-        name: "Cook",
-        email: "pantry@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
-    userId = user.id;
+    ({ householdId, userId } = await makeHousehold());
   });
 
   afterAll(async () => {
@@ -163,11 +157,11 @@ describe.skipIf(!hasDb)("the pantry list", () => {
   });
 
   it("keeps what you add, sorted by name", async () => {
-    await addPantryItem("Olive oil", userId);
-    await addPantryItem("Flour", userId);
-    await addPantryItem("Salt", userId);
+    await addPantryItem("Olive oil", householdId, userId);
+    await addPantryItem("Flour", householdId, userId);
+    await addPantryItem("Salt", householdId, userId);
 
-    expect((await listPantryItems()).map((i) => i.name)).toEqual([
+    expect((await listPantryItems(householdId)).map((i) => i.name)).toEqual([
       "Flour",
       "Olive oil",
       "Salt",
@@ -175,7 +169,7 @@ describe.skipIf(!hasDb)("the pantry list", () => {
   });
 
   it("stores the name as typed and matches on a normalised form", async () => {
-    const result = await addPantryItem("  Olive Oil  ", userId);
+    const result = await addPantryItem("  Olive Oil  ", householdId, userId);
     expect(result.ok && result.item.name).toBe("Olive Oil");
     expect(result.ok && result.item.normalisedName).toBe("olive oil");
   });
@@ -183,8 +177,8 @@ describe.skipIf(!hasDb)("the pantry list", () => {
   it("treats adding the same staple twice as a no-op, not a failure", async () => {
     // Two people tidying the pantry on a Sunday should not see an error for
     // agreeing with each other.
-    const first = await addPantryItem("Olive oil", userId);
-    const second = await addPantryItem("olive oil", userId);
+    const first = await addPantryItem("Olive oil", householdId, userId);
+    const second = await addPantryItem("olive oil", householdId, userId);
 
     expect(second.ok).toBe(true);
     expect(first.ok && second.ok && second.item.id).toBe(
@@ -194,50 +188,45 @@ describe.skipIf(!hasDb)("the pantry list", () => {
   });
 
   it("refuses a blank name", async () => {
-    const result = await addPantryItem("   ", userId);
+    const result = await addPantryItem("   ", householdId, userId);
     expect(result.ok).toBe(false);
   });
 
   it("refuses a name too long to be an ingredient", async () => {
-    expect((await addPantryItem("x".repeat(121), userId)).ok).toBe(false);
+    expect((await addPantryItem("x".repeat(121), householdId, userId)).ok).toBe(
+      false,
+    );
   });
 
   it("puts an item back on the shopping list when removed", async () => {
-    const added = await addPantryItem("Olive oil", userId);
+    const added = await addPantryItem("Olive oil", householdId, userId);
     if (!added.ok) throw new Error("setup failed");
 
-    await removePantryItem(added.item.id);
-    expect(await listPantryItems()).toEqual([]);
+    await removePantryItem(added.item.id, householdId);
+    expect(await listPantryItems(householdId)).toEqual([]);
   });
 
   it("is shared, not per person", async () => {
     // One kitchen, one salt cellar. What one person adds, everyone sees.
-    const other = await prisma.user.create({
-      data: {
-        id: "pantry-other",
-        name: "Other",
-        email: "other@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
+    const other = await makeUser(householdId, "pantry-other");
 
-    await addPantryItem("Olive oil", userId);
-    await addPantryItem("Flour", other.id);
+    await addPantryItem("Olive oil", householdId, userId);
+    await addPantryItem("Flour", householdId, other);
 
-    expect((await listPantryItems()).map((i) => i.name)).toEqual([
+    expect((await listPantryItems(householdId)).map((i) => i.name)).toEqual([
       "Flour",
       "Olive oil",
     ]);
   });
 
   it("is refused at the database level as a duplicate", async () => {
-    await addPantryItem("Olive oil", userId);
+    await addPantryItem("Olive oil", householdId, userId);
     await expect(
       prisma.pantryItem.create({
         data: {
           name: "Olive Oil",
           normalisedName: "olive oil",
+          householdId,
           createdById: userId,
         },
       }),
@@ -245,24 +234,8 @@ describe.skipIf(!hasDb)("the pantry list", () => {
   });
 
   it("goes with a departing user", async () => {
-    await addPantryItem("Olive oil", userId);
+    await addPantryItem("Olive oil", householdId, userId);
     await prisma.user.delete({ where: { id: userId } });
-    expect(await listPantryItems()).toEqual([]);
+    expect(await listPantryItems(householdId)).toEqual([]);
   });
 });
-
-async function reset() {
-  await prisma.pantryItem.deleteMany();
-  await prisma.weeklySkip.deleteMany();
-  await prisma.recipeReview.deleteMany();
-  await prisma.recipeTag.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.plannedMeal.deleteMany();
-  await prisma.shoppingHandoff.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
-}
