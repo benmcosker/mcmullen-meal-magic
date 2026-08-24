@@ -18,6 +18,7 @@ import {
 } from "@/app/upload/actions";
 import type { ExtractedRecipe, RecipeInput } from "@/lib/recipe-schema";
 
+import { RecipePhoto } from "./RecipePhoto";
 import { RecipeForm } from "./RecipeForm";
 
 /** A little beyond the server's own 60s ceiling. */
@@ -157,16 +158,11 @@ export function UploadWorkflow() {
         ) : null}
 
         {assets.imageUrl ? (
-          <Box
-            component="img"
+          <RecipePhoto
             src={assets.imageUrl}
-            alt=""
-            sx={{
-              width: "100%",
-              maxHeight: 280,
-              objectFit: "cover",
-              borderRadius: 2,
-            }}
+            height={{ xs: 180, sm: 280 }}
+            rounded={2}
+            sizes="(max-width: 900px) 100vw, 900px"
           />
         ) : (
           <Typography variant="body2" color="text.secondary">
