@@ -52,9 +52,31 @@ export async function searchRecipeIds(
   const sort = options.sort ?? DEFAULT_SORT;
   const tagSlugs = options.tagSlugs?.filter(Boolean) ?? [];
 
+  // Only "highest rated" needs the review aggregate, so the join is paid for
+  // only when it is asked for.
+  const ratingJoin =
+    sort === "rating"
+      ? Prisma.sql`
+          LEFT JOIN (
+            SELECT "recipeId",
+                   AVG("stars")::float8 AS avg_stars,
+                   COUNT(*)::int AS review_count
+            FROM "recipe_review"
+            GROUP BY "recipeId"
+          ) rr ON rr."recipeId" = r."id"
+        `
+      : Prisma.empty;
+
   const orderBy = {
     newest: Prisma.sql`r."createdAt" DESC`,
     oldest: Prisma.sql`r."createdAt" ASC`,
+    // Rounded to the same one place the card shows, so two recipes both
+    // reading "4.3" are a genuine tie rather than being separated by a digit
+    // nobody can see. Ties then go to the recipe more people have rated -
+    // four fives is a stronger four-and-a-half than one is. Unrated recipes
+    // sort last: Postgres would otherwise lead with them, NULL being "greater
+    // than" everything in a DESC order.
+    rating: Prisma.sql`round(rr.avg_stars::numeric, 1) DESC NULLS LAST, rr.review_count DESC, r."createdAt" DESC`,
     // Case-insensitive, or "apple crumble" sorts after "Zabaglione".
     title: Prisma.sql`lower(r."title") ASC`,
   }[sort];
@@ -80,6 +102,7 @@ export async function searchRecipeIds(
     return prisma.$queryRaw<RecipeSearchHit[]>(Prisma.sql`
       SELECT r."id", 0::float8 AS rank
       FROM "recipe" r
+      ${ratingJoin}
       WHERE TRUE ${tagFilter}
       ORDER BY ${orderBy}
       LIMIT ${limit} OFFSET ${offset}
@@ -91,6 +114,7 @@ export async function searchRecipeIds(
       r."id",
       ts_rank(r."search_vector", websearch_to_tsquery('english', ${query}))::float8 AS rank
     FROM "recipe" r
+    ${ratingJoin}
     WHERE (
       r."search_vector" @@ websearch_to_tsquery('english', ${query})
       OR r."title" ILIKE ${like}

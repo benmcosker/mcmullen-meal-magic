@@ -8,6 +8,7 @@
  */
 export const RECIPE_SORTS = [
   { value: "newest", label: "Newest first" },
+  { value: "rating", label: "Highest rated" },
   { value: "oldest", label: "Oldest first" },
   { value: "title", label: "A–Z" },
 ] as const;
