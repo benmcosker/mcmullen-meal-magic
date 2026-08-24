@@ -27,10 +27,45 @@ export async function GET() {
     // SELECT 1 would sail straight past.
     const users = await prisma.user.count();
 
+    // Whether this connection can write, asked without writing anything.
+    //
+    // Every page in the app is reads; the writes are invites, recipes, the
+    // plan. A connection that reads but refuses to write therefore looks
+    // completely healthy until somebody tries to save something, and then
+    // fails in whatever place they happened to try. Both of these describe the
+    // session the app itself is holding, which is the thing in question - a
+    // console attached to some other endpoint cannot answer it.
+    const [session] = await prisma.$queryRaw<
+      { replica: boolean; readOnly: string }[]
+    >`
+      SELECT pg_is_in_recovery() AS replica,
+             current_setting('default_transaction_read_only') AS "readOnly"
+    `;
+    const writable = !session.replica && session.readOnly !== "on";
+
     return NextResponse.json({
-      status: "ok",
-      database: { reachable: true, migrated: true, users },
+      status: writable ? "ok" : "read-only",
+      database: {
+        reachable: true,
+        migrated: true,
+        writable,
+        // Named apart because the fixes differ: a replica is the wrong
+        // endpoint in DATABASE_URL, while a primary in read-only mode is
+        // usually the provider having put the project there - over a limit,
+        // or mid-maintenance.
+        ...(writable
+          ? {}
+          : { reason: session.replica ? "read replica" : "read-only mode" }),
+        users,
+      },
       queryMs: Date.now() - startedAt,
+      ...(writable
+        ? {}
+        : {
+            hint: session.replica
+              ? "DATABASE_URL points at a read replica. Point it at the primary."
+              : "The database is in read-only mode. Check the provider's console - a project over its limit is the usual cause.",
+          }),
       disabledFeatures: disabledFeatures.map((f) => f.feature),
     });
   } catch (error) {

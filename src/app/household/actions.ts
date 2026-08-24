@@ -8,6 +8,25 @@ import { requireHousehold } from "@/lib/session";
 
 export type InviteKind = "family" | "outside";
 
+/**
+ * As much of a failure as is safe to put on the screen.
+ *
+ * A database error's text can name columns, constraints and values, so it does
+ * not belong in a browser. Its *code* names nothing - P2003 is a foreign key,
+ * P2002 a duplicate - and it is the difference between somebody reporting
+ * "it broke" and reporting something anyone can act on. This household runs on
+ * two accounts and the person hitting the error is the person who has to fix
+ * it; making them go and find a serverless log first is a poor trade.
+ */
+function hint(error: unknown): string {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : null;
+
+  return code ? `Please try again, and mention ${code}.` : "Please try again.";
+}
+
 export type CreatedInvite = {
   code: string;
   expiresAt: string;
@@ -40,12 +59,25 @@ export async function createInviteAction(
     return { ok: false, error: "That does not look like an email address." };
   }
 
-  const invite = await createInvite({
-    createdById: user.id,
-    householdId: kind === "family" ? user.householdId : null,
-    householdName: kind === "outside" ? householdName : null,
-    email: trimmed || null,
-  });
+  let invite;
+  try {
+    invite = await createInvite({
+      createdById: user.id,
+      householdId: kind === "family" ? user.householdId : null,
+      householdName: kind === "outside" ? householdName : null,
+      email: trimmed || null,
+    });
+  } catch (error) {
+    // An unhandled throw here reaches the browser as a bare Next.js error
+    // digest - a number, with the message stripped out because it is a server
+    // error. That is the right thing to show a stranger and useless to
+    // everyone, including whoever has to work out what went wrong.
+    console.error("[invite] could not create", error);
+    return {
+      ok: false,
+      error: `That code could not be created. ${hint(error)}`,
+    };
+  }
 
   revalidatePath("/household");
   return {
@@ -67,7 +99,13 @@ export async function renameHouseholdAction(
 ): Promise<RenameResult> {
   const user = await requireHousehold();
 
-  const saved = await renameHousehold(user.householdId, name);
+  let saved: string | null;
+  try {
+    saved = await renameHousehold(user.householdId, name);
+  } catch (error) {
+    console.error("[household] could not rename", error);
+    return { ok: false, error: "That name could not be saved. Try again." };
+  }
   if (!saved) return { ok: false, error: "Give the household a name." };
 
   revalidatePath("/household");
@@ -77,6 +115,13 @@ export async function renameHouseholdAction(
 /** Withdraw a code before anyone uses it. */
 export async function revokeInviteAction(id: string): Promise<void> {
   const user = await requireHousehold();
-  await revokeInvite(id, user.id);
+  try {
+    await revokeInvite(id, user.id);
+  } catch (error) {
+    // Nothing useful to say on the page - the code is either gone or it is
+    // not, and the list refreshes either way - but the reason belongs in the
+    // log rather than nowhere.
+    console.error("[invite] could not revoke", error);
+  }
   revalidatePath("/household");
 }
