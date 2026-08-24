@@ -2,7 +2,6 @@ import AddIcon from "@mui/icons-material/Add";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
-import CardMedia from "@mui/material/CardMedia";
 import Chip from "@mui/material/Chip";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
@@ -13,6 +12,7 @@ import { AppShell } from "@/components/AppShell";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { LinkButton } from "@/components/LinkButton";
 import { ReviewStars } from "@/components/ReviewStars";
+import { RecipePhoto } from "@/components/RecipePhoto";
 import { RecipePlaceholder } from "@/components/RecipePlaceholder";
 import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
@@ -101,11 +101,16 @@ export default async function RecipesPage({
                   }}
                 >
                   {recipe.imageUrl ? (
-                    <CardMedia
-                      component="img"
-                      image={recipe.imageUrl}
-                      alt=""
-                      sx={{ height: 160, objectFit: "cover" }}
+                    // One card per row on a phone, two on a tablet, three on
+                    // a desktop. The last value is a fixed width, not a
+                    // fraction: the page sits in a 1200px container, so past
+                    // that the card stops growing and a vw figure would keep
+                    // asking for larger files that are never drawn.
+                    <RecipePhoto
+                      src={recipe.imageUrl}
+                      height={160}
+                      rounded={0}
+                      sizes="(max-width: 600px) 100vw, (max-width: 900px) 50vw, (max-width: 1200px) 32vw, 380px"
                     />
                   ) : (
                     // Not omitted: a card with no image is shorter than its

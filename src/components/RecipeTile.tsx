@@ -5,6 +5,7 @@ import Typography from "@mui/material/Typography";
 
 import type { ReviewSummary } from "@/lib/review-schema";
 
+import { RecipePhoto } from "./RecipePhoto";
 import { RecipePlaceholder } from "./RecipePlaceholder";
 import { ReviewStars } from "./ReviewStars";
 
@@ -33,17 +34,12 @@ export function RecipeTile({
   return (
     <Box sx={{ width: "100%" }}>
       {recipe.imageUrl ? (
-        <Box
-          component="img"
+        // The smallest place a photo appears, and the one that gained most
+        // from this: a tile 96px tall was pulling a 1600px file.
+        <RecipePhoto
           src={recipe.imageUrl}
-          alt=""
-          sx={{
-            width: "100%",
-            height,
-            objectFit: "cover",
-            borderRadius: 1,
-            display: "block",
-          }}
+          height={height}
+          sizes="(max-width: 600px) 45vw, (max-width: 900px) 30vw, (max-width: 1200px) 15vw, 165px"
         />
       ) : (
         <RecipePlaceholder

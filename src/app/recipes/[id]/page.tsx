@@ -14,6 +14,7 @@ import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { IconChip } from "@/components/IconChip";
 import { LinkButton } from "@/components/LinkButton";
 import { RecipeImageUploader } from "@/components/RecipeImageUploader";
+import { RecipePhoto } from "@/components/RecipePhoto";
 import { RecipePlaceholder } from "@/components/RecipePlaceholder";
 import { RecipeReviews } from "@/components/RecipeReviews";
 import { ReviewStars } from "@/components/ReviewStars";
@@ -116,17 +117,14 @@ export default async function RecipePage({
 
       <Box sx={{ mb: 3 }}>
         {recipe.imageUrl ? (
-          <Box
-            component="img"
+          // The one photo already on screen when the page opens, so it loads
+          // eagerly; everything else on the site stays lazy.
+          <RecipePhoto
             src={recipe.imageUrl}
-            alt=""
-            sx={{
-              width: "100%",
-              maxHeight: 380,
-              objectFit: "cover",
-              borderRadius: 2,
-              display: "block",
-            }}
+            height={{ xs: 200, sm: 380 }}
+            rounded={2}
+            priority
+            sizes="(max-width: 1200px) 100vw, 1152px"
           />
         ) : (
           <RecipePlaceholder
