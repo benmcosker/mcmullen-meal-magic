@@ -13,6 +13,7 @@ import {
   updateRecipe,
 } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
+import { setRecipeImage } from "@/lib/recipe-image";
 import { getRecipe, searchRecipes } from "@/lib/recipes";
 import { getReviewSummary, saveReview } from "@/lib/reviews";
 
@@ -149,6 +150,22 @@ describe.skipIf(!hasDb)("two households", () => {
 
       expect(await deleteRecipe(id, ours.householdId)).toBe(false);
       expect(await getRecipe(id)).not.toBeNull();
+    });
+
+    it("refuses to change the photo on another household's recipe", async () => {
+      // The picture is part of the card everybody cooks from, so it follows
+      // the same rule as the words.
+      const id = await add(theirs, "Their Dahl");
+
+      await expect(
+        setRecipeImage(
+          id,
+          ours.householdId,
+          new Uint8Array([1, 2, 3]),
+          "photo.jpg",
+          "image/jpeg",
+        ),
+      ).rejects.toThrow(/No such recipe/);
     });
 
     it("lets the household that added it edit and delete it", async () => {
