@@ -245,7 +245,7 @@ function InviteForm({
               fullWidth
               size="small"
             />
-            <Button type="submit" variant="contained" disabled={pending}>
+            <Button type="submit" variant="contained" disabled={pending} sx={{lineHeight: "1rem"}}>
               Create code
             </Button>
           </Stack>
