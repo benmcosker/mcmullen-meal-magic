@@ -96,7 +96,29 @@ export function RecipeSearchBar({ tags }: { tags: TagOption[] }) {
       </Stack>
 
       {tags.length > 0 ? (
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+        /*
+         * One scrolling row on a phone, wrapped everywhere else.
+         *
+         * A dozen tags wrap to four rows on a narrow screen and push the first
+         * recipe off the bottom - the filter ends up costing more space than
+         * the thing it filters. Sideways they stay reachable without taking
+         * the screen.
+         */
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            flexWrap: { xs: "nowrap", sm: "wrap" },
+            overflowX: { xs: "auto", sm: "visible" },
+            // Room for the chips' focus ring, which the overflow would clip.
+            py: 0.5,
+            mx: { xs: -0.5, sm: 0 },
+            px: { xs: 0.5, sm: 0 },
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": { display: "none" },
+            "& > *": { flexShrink: 0 },
+          }}
+        >
           {tags.map((tag) => (
             <Chip
               key={tag.slug}
