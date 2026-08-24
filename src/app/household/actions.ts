@@ -8,6 +8,25 @@ import { requireHousehold } from "@/lib/session";
 
 export type InviteKind = "family" | "outside";
 
+/**
+ * As much of a failure as is safe to put on the screen.
+ *
+ * A database error's text can name columns, constraints and values, so it does
+ * not belong in a browser. Its *code* names nothing - P2003 is a foreign key,
+ * P2002 a duplicate - and it is the difference between somebody reporting
+ * "it broke" and reporting something anyone can act on. This household runs on
+ * two accounts and the person hitting the error is the person who has to fix
+ * it; making them go and find a serverless log first is a poor trade.
+ */
+function hint(error: unknown): string {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : null;
+
+  return code ? `Please try again, and mention ${code}.` : "Please try again.";
+}
+
 export type CreatedInvite = {
   code: string;
   expiresAt: string;
@@ -51,13 +70,12 @@ export async function createInviteAction(
   } catch (error) {
     // An unhandled throw here reaches the browser as a bare Next.js error
     // digest - a number, with the message stripped out because it is a server
-    // error. That is the correct thing to show a stranger and useless to
-    // everyone, including whoever has to work out what went wrong. Log the
-    // real reason where it can be read, and give the page something to say.
+    // error. That is the right thing to show a stranger and useless to
+    // everyone, including whoever has to work out what went wrong.
     console.error("[invite] could not create", error);
     return {
       ok: false,
-      error: "That code could not be created. Please try again.",
+      error: `That code could not be created. ${hint(error)}`,
     };
   }
 
