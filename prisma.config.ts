@@ -30,5 +30,9 @@ export default defineConfig({
     // Only the CLI reads this file. The running app builds its own connection
     // from DATABASE_URL in src/lib/db.ts, so the two are independent by design.
     url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || "",
+    // A scratch database Prisma resets to replay the migration history when it
+    // needs to compare it against the schema. Only ever used by the CLI, and
+    // only when it is set - production has no such database and needs none.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL || undefined,
   },
 });

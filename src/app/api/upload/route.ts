@@ -10,7 +10,7 @@ import { extractRecipeFromPdf } from "@/lib/extract-recipe";
 import { extractLargestJpeg } from "@/lib/pdf-images";
 import { inspectPdf } from "@/lib/pdf-inspect";
 import { blobStoreId, storeFile } from "@/lib/storage";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentHousehold } from "@/lib/session";
 
 /**
  * Reading a PDF takes as long as it takes.
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 async function handleUpload(request: Request) {
   // Upload is restricted to signed-in users. This is the enforcement point;
   // hiding the nav link is not.
-  const user = await getCurrentUser();
+  const user = await getCurrentHousehold();
   if (!user) {
     return NextResponse.json({ error: "Sign in to upload." }, { status: 401 });
   }

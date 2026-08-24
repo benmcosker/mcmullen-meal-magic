@@ -5,15 +5,15 @@ import { z } from "zod";
 
 import type { ReviewInput } from "@/lib/review-schema";
 import { deleteReview, saveReview } from "@/lib/reviews";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 import type { ActionResult } from "./actions";
 
 /**
- * Reviewing is open to every signed-in member of the household, on every
- * recipe - the same rule as reading the library. Only the session is checked;
- * ownership of the recipe is deliberately not, or the person who uploaded a
- * dish would be the only one unable to hear what anyone thought of it.
+ * Reviewing is open to everybody signed in, on every recipe in the library -
+ * the same rule as reading it. Neither who uploaded the dish nor which
+ * household they are in is checked, or the pool of opinions the average is
+ * drawn from would be three people rather than everyone who has cooked it.
  */
 
 /** The list card and the planner tile both show the average, so both go stale. */
@@ -28,7 +28,7 @@ export async function saveReviewAction(
   recipeId: string,
   input: ReviewInput,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   try {
     await saveReview(recipeId, user.id, input);
@@ -56,7 +56,7 @@ export async function saveReviewAction(
 export async function deleteReviewAction(
   recipeId: string,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const removed = await deleteReview(recipeId, user.id);
   if (!removed) {

@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db";
-import { searchRecipes, slugifyTag, upsertTags } from "@/lib/recipes";
+import {
+  searchRecipes,
+  slugifyTag,
+  upsertTags,
+  type RecipeSearchOptions,
+} from "@/lib/recipes";
+
+import { makeHousehold, resetDatabase as reset } from "./support/db";
 
 // Integration tests: they exercise Postgres-specific behaviour (the tsvector
 // trigger, trigram matching, tag filtering) that cannot be faked usefully.
@@ -10,17 +17,12 @@ import { searchRecipes, slugifyTag, upsertTags } from "@/lib/recipes";
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe.skipIf(!hasDb)("recipe search", () => {
+  let householdId: string;
+  let userId: string;
+
   beforeAll(async () => {
     await reset();
-    await prisma.user.create({
-      data: {
-        id: "test-user",
-        name: "Test",
-        email: "test@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
+    ({ householdId, userId } = await makeHousehold());
 
     const [weeknight, sheetPan, seafood] = await upsertTags([
       "Weeknight",
@@ -38,7 +40,8 @@ describe.skipIf(!hasDb)("recipe search", () => {
           "Sear until golden",
           "Deglaze with wine",
         ],
-        createdById: "test-user",
+        createdById: userId,
+        householdId,
         ingredients: {
           create: [
             { name: "chicken breast", quantity: 2, unit: "lb", position: 0 },
@@ -55,7 +58,8 @@ describe.skipIf(!hasDb)("recipe search", () => {
         title: "Sheet Pan Salmon",
         description: "Weeknight fish",
         instructions: ["Roast at 425 until flaky"],
-        createdById: "test-user",
+        createdById: userId,
+        householdId,
         ingredients: {
           create: [{ name: "salmon fillet", quantity: 2, position: 0 }],
         },
@@ -69,8 +73,8 @@ describe.skipIf(!hasDb)("recipe search", () => {
     await prisma.$disconnect();
   });
 
-  const titles = async (...args: Parameters<typeof searchRecipes>) =>
-    (await searchRecipes(...args)).map((r) => r.title);
+  const titles = async (options: Partial<RecipeSearchOptions> = {}) =>
+    (await searchRecipes({ ...options })).map((r) => r.title);
 
   it("matches a word in the title", async () => {
     expect(await titles({ query: "piccata" })).toEqual(["Chicken Piccata"]);
@@ -159,18 +163,3 @@ describe("slugifyTag", () => {
     expect(slugifyTag("Kid's Favourite")).toBe("kid-s-favourite");
   });
 });
-
-async function reset() {
-  // Order matters: children before parents, since some relations are Restrict
-  // by default rather than Cascade.
-  await prisma.recipeTag.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.pantryItem.deleteMany();
-  await prisma.weeklySkip.deleteMany();
-  await prisma.plannedMeal.deleteMany();
-  await prisma.shoppingHandoff.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
-}

@@ -4,16 +4,18 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EditRecipeForm } from "@/components/EditRecipeForm";
 import { getRecipe } from "@/lib/recipes";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 export default async function EditRecipePage({
   params,
 }: PageProps<"/recipes/[id]/edit">) {
-  await requireUser();
+  const { householdId } = await requireHousehold();
 
   const { id } = await params;
   const recipe = await getRecipe(id);
-  if (!recipe) notFound();
+  // Reachable by typing the URL even though the button is hidden. Saving would
+  // be refused anyway; this is so nobody fills in a form that cannot be saved.
+  if (!recipe || recipe.householdId !== householdId) notFound();
 
   return (
     <AppShell>

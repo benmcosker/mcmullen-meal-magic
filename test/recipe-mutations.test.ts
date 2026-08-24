@@ -10,6 +10,8 @@ import {
 import { recipeInput } from "@/lib/recipe-schema";
 import { searchRecipes } from "@/lib/recipes";
 
+import { makeHousehold, resetDatabase as reset } from "./support/db";
+
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const base = {
@@ -28,21 +30,11 @@ const base = {
 
 describe.skipIf(!hasDb)("recipe mutations", () => {
   let userId: string;
+  let householdId: string;
 
   beforeEach(async () => {
     await reset();
-    const user = await prisma.user.create({
-      data: {
-        // User.id has no database default: better-auth assigns it. Tests that
-        // create users directly have to supply one.
-        id: "test-cook",
-        name: "Cook",
-        email: "cook@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
-    userId = user.id;
+    ({ householdId, userId } = await makeHousehold());
   });
 
   afterAll(async () => {
@@ -51,13 +43,13 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
   });
 
   it("creates a recipe that is immediately searchable", async () => {
-    await createRecipe(recipeInput.parse(base), userId);
+    await createRecipe(recipeInput.parse(base), householdId, userId);
     const found = await searchRecipes({ query: "miso" });
     expect(found.map((r) => r.title)).toEqual(["Miso Butter Salmon"]);
   });
 
   it("stores ingredients in the order given", async () => {
-    const id = await createRecipe(recipeInput.parse(base), userId);
+    const id = await createRecipe(recipeInput.parse(base), householdId, userId);
     const recipe = await prisma.recipe.findUniqueOrThrow({
       where: { id },
       include: { ingredients: { orderBy: { position: "asc" } } },
@@ -69,13 +61,14 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
   });
 
   it("reuses an existing tag rather than duplicating it", async () => {
-    await createRecipe(recipeInput.parse(base), userId);
+    await createRecipe(recipeInput.parse(base), householdId, userId);
     await createRecipe(
       recipeInput.parse({
         ...base,
         title: "Another Weeknight Dish",
         tags: ["Weeknight"],
       }),
+      householdId,
       userId,
     );
 
@@ -85,10 +78,11 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
   });
 
   it("replaces ingredients and tags on edit rather than accumulating them", async () => {
-    const id = await createRecipe(recipeInput.parse(base), userId);
+    const id = await createRecipe(recipeInput.parse(base), householdId, userId);
 
     await updateRecipe(
       id,
+      householdId,
       recipeInput.parse({
         ...base,
         title: "Miso Butter Cod",
@@ -106,9 +100,10 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
   });
 
   it("reindexes for search after an edit", async () => {
-    const id = await createRecipe(recipeInput.parse(base), userId);
+    const id = await createRecipe(recipeInput.parse(base), householdId, userId);
     await updateRecipe(
       id,
+      householdId,
       recipeInput.parse({ ...base, title: "Miso Butter Cod" }),
     );
 
@@ -125,6 +120,7 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
     // Renaming away from a word does drop it, when nothing else supplies it.
     await updateRecipe(
       id,
+      householdId,
       recipeInput.parse({
         ...base,
         title: "Miso Butter Cod",
@@ -135,8 +131,8 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
   });
 
   it("removes ingredients and tag links when the recipe is deleted", async () => {
-    const id = await createRecipe(recipeInput.parse(base), userId);
-    await deleteRecipe(id);
+    const id = await createRecipe(recipeInput.parse(base), householdId, userId);
+    await deleteRecipe(id, householdId);
 
     expect(await prisma.ingredient.count({ where: { recipeId: id } })).toBe(0);
     expect(await prisma.recipeTag.count({ where: { recipeId: id } })).toBe(0);
@@ -176,18 +172,3 @@ describe("recipeInput validation", () => {
     ).toBe(false);
   });
 });
-
-async function reset() {
-  await prisma.recipeTag.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.pantryItem.deleteMany();
-  await prisma.weeklySkip.deleteMany();
-  await prisma.plannedMeal.deleteMany();
-  await prisma.shoppingHandoff.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
-}

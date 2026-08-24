@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { normaliseName, weekStartOf } from "@/lib/grocery";
 import { addPantryItem, removePantryItem } from "@/lib/pantry";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 /**
  * "We already have milk" - for this week only.
@@ -18,7 +18,7 @@ export async function skipForWeekAction(
   name: string,
   weekStartIso: string,
 ): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const trimmed = name.trim();
   if (!trimmed) return;
@@ -28,7 +28,13 @@ export async function skipForWeekAction(
 
   try {
     await prisma.weeklySkip.create({
-      data: { name: trimmed, normalisedName, weekStart, createdById: user.id },
+      data: {
+        name: trimmed,
+        normalisedName,
+        weekStart,
+        householdId: user.householdId,
+        createdById: user.id,
+      },
     });
   } catch (error) {
     // P2002 means someone ticked the same ingredient a moment earlier. The
@@ -48,8 +54,10 @@ export async function skipForWeekAction(
 
 /** Put a week's skipped ingredient back on the list. */
 export async function unskipForWeekAction(id: string): Promise<void> {
-  await requireUser();
-  await prisma.weeklySkip.deleteMany({ where: { id } });
+  const user = await requireHousehold();
+  await prisma.weeklySkip.deleteMany({
+    where: { id, householdId: user.householdId },
+  });
   revalidatePath("/plan");
 }
 
@@ -59,15 +67,15 @@ export async function unskipForWeekAction(id: string): Promise<void> {
  * you notice.
  */
 export async function addToPantryAction(name: string): Promise<void> {
-  const user = await requireUser();
-  await addPantryItem(name, user.id);
+  const user = await requireHousehold();
+  await addPantryItem(name, user.householdId, user.id);
   revalidatePath("/plan");
   revalidatePath("/pantry");
 }
 
 export async function removeFromPantryAction(id: string): Promise<void> {
-  await requireUser();
-  await removePantryItem(id);
+  const user = await requireHousehold();
+  await removePantryItem(id, user.householdId);
   revalidatePath("/plan");
   revalidatePath("/pantry");
 }

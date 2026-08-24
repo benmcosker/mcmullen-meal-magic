@@ -18,6 +18,7 @@ type RecipeAssets = {
 
 export async function createRecipe(
   input: RecipeInput,
+  householdId: string,
   createdById: string,
   assets: RecipeAssets = {},
 ): Promise<string> {
@@ -44,6 +45,7 @@ export async function createRecipe(
       pdfFilename: assets.pdfFilename ?? null,
       pdfSha256: assets.pdfSha256 ?? null,
       imageUrl: assets.imageUrl ?? null,
+      householdId,
       createdById,
       ingredients: {
         create: input.ingredients.map((ingredient, position) => ({
@@ -62,23 +64,36 @@ export async function createRecipe(
 }
 
 /**
- * Replace a recipe's contents.
+ * Replace a recipe's contents. Returns false if another household added it.
+ *
+ * Everyone can read the library; only the family who put a recipe in it can
+ * rewrite it. Without that, one household could quietly reword a card another
+ * household cooks from every week.
  *
  * Ingredients and tags are deleted and recreated rather than diffed: the lists
  * are short, ordering matters, and a diff would have to reconcile renames it
  * has no stable identity for. Wrapped in a transaction so a failure part-way
- * cannot leave a recipe with no ingredients.
+ * cannot leave a recipe with no ingredients, and the ownership check runs
+ * inside it rather than before, leaving no window between the answer and the
+ * write.
  */
 export async function updateRecipe(
   id: string,
+  householdId: string,
   input: RecipeInput,
-): Promise<void> {
+): Promise<boolean> {
   const tagIds = await upsertTags(input.tags);
 
-  await prisma.$transaction([
-    prisma.ingredient.deleteMany({ where: { recipeId: id } }),
-    prisma.recipeTag.deleteMany({ where: { recipeId: id } }),
-    prisma.recipe.update({
+  return prisma.$transaction(async (tx) => {
+    const owned = await tx.recipe.findFirst({
+      where: { id, householdId },
+      select: { id: true },
+    });
+    if (!owned) return false;
+
+    await tx.ingredient.deleteMany({ where: { recipeId: id } });
+    await tx.recipeTag.deleteMany({ where: { recipeId: id } });
+    await tx.recipe.update({
       where: { id },
       data: {
         title: input.title,
@@ -106,12 +121,30 @@ export async function updateRecipe(
         },
         tags: { create: tagIds.map((tagId) => ({ tagId })) },
       },
-    }),
-  ]);
+    });
+
+    return true;
+  });
 }
 
-export async function deleteRecipe(id: string): Promise<void> {
-  await prisma.recipe.delete({ where: { id } });
+/**
+ * Remove a recipe, if this household added it. Returns whether it did.
+ *
+ * The library is shared, so a delete is not a private act: it takes the card
+ * away from everybody, including whoever planned it for Thursday. Only the
+ * family who added it may do that.
+ *
+ * `deleteMany` rather than `delete` so somebody else's id matches nothing
+ * instead of erroring, which is the same answer as an id already gone.
+ */
+export async function deleteRecipe(
+  id: string,
+  householdId: string,
+): Promise<boolean> {
+  const { count } = await prisma.recipe.deleteMany({
+    where: { id, householdId },
+  });
+  return count > 0;
 }
 
 /** Tags with a usage count, for the filter bar. */

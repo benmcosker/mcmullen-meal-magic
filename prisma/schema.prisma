@@ -9,6 +9,29 @@ datasource db {
   provider = "postgresql"
 }
 
+/// A family, and the unit everything is scoped to.
+///
+/// The app began as one household with the scoping left implicit - a single
+/// plan, a single pantry, one row per meal slot in the entire database. This
+/// model makes that unit explicit so a second family can use the app without
+/// fighting the first for Tuesday dinner.
+model Household {
+  id        String   @id @default(cuid())
+  /// Shown in the nav and on the household page. "The McMullens".
+  name      String
+  createdAt DateTime @default(now())
+
+  members  User[]
+  invites  Invite[]
+  recipes  Recipe[]
+  meals    PlannedMeal[]
+  pantry   PantryItem[]
+  skips    WeeklySkip[]
+  handoffs ShoppingHandoff[]
+
+  @@map("household")
+}
+
 model User {
   id            String    @id
   name          String
@@ -20,15 +43,27 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  recipes            Recipe[]
-  invitesSent        Invite[]            @relation("InviteSender")
-  inviteUsed         Invite?             @relation("InviteRedeemer")
-  shoppingRuns       ShoppingHandoff[]
-  pantryItems        PantryItem[]
-  weeklySkips        WeeklySkip[]
-  reviews            RecipeReview[]
+  /// Which family this login belongs to. Exactly one - several logins share a
+  /// household, not the reverse.
+  ///
+  /// Nullable only because better-auth's Prisma adapter inserts the user row
+  /// itself and knows nothing about this column. The signup hook assigns a
+  /// household immediately afterwards and deletes the account if it cannot, so
+  /// a persisted user without one is not a state the app produces. Read it
+  /// through `requireHousehold()` rather than trusting it here.
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  recipes      Recipe[]
+  invitesSent  Invite[]          @relation("InviteSender")
+  inviteUsed   Invite?           @relation("InviteRedeemer")
+  shoppingRuns ShoppingHandoff[]
+  pantryItems  PantryItem[]
+  weeklySkips  WeeklySkip[]
+  reviews      RecipeReview[]
 
   @@unique([email])
+  @@index([householdId])
   @@map("user")
 }
 
@@ -91,6 +126,10 @@ model Verification {
 
 /// Signup is closed. An existing user mints an invite; the recipient redeems
 /// the code to create the only account that code will ever create.
+///
+/// The invite also decides which family the new account lands in, which is what
+/// separates the two kinds of invitation: one into your own household, one to
+/// someone outside it who gets a household of their own.
 model Invite {
   id         String    @id @default(cuid())
   code       String    @unique
@@ -100,6 +139,19 @@ model Invite {
   createdAt  DateTime  @default(now())
   redeemedAt DateTime?
 
+  /// The household this code joins. Null means the redeemer gets a brand new
+  /// household of their own - an invitation to use the app, not to join the
+  /// family. Encoded as the presence of a household rather than a separate
+  /// kind flag, so the two can never disagree.
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  /// What to call the household this code will create, chosen by whoever sent
+  /// it. Only meaningful when `householdId` is null. Null falls back to a name
+  /// derived from the redeemer, which is the right answer when the sender did
+  /// not know what the family calls itself.
+  householdName String?
+
   createdById String
   createdBy   User   @relation("InviteSender", fields: [createdById], references: [id], onDelete: Cascade)
 
@@ -108,6 +160,7 @@ model Invite {
   redeemedBy   User?   @relation("InviteRedeemer", fields: [redeemedById], references: [id], onDelete: SetNull)
 
   @@index([createdById])
+  @@index([householdId])
   @@map("invite")
 }
 
@@ -159,7 +212,7 @@ model Recipe {
   yieldNote    String?
   /// "9x13 pan", "Dutch oven", "Stand mixer". Worth knowing before you start
   /// rather than at step four.
-  equipment    String[]     @default([])
+  equipment    String[]         @default([])
 
   /// Blob URLs. Both optional: the dish photo especially is best-effort, since
   /// not every PDF contains one.
@@ -169,8 +222,21 @@ model Recipe {
   /// second upload. Unique, and null for recipes typed in by hand - Postgres
   /// treats NULLs as distinct, so any number of manual recipes coexist while
   /// one PDF can only ever produce one recipe.
+  /// Unique across the whole library, because the library is shared: if
+  /// somebody has already uploaded this exact card, the recipe is there for
+  /// everyone and a second copy is noise rather than a second dish.
   pdfSha256   String? @unique
   imageUrl    String?
+
+  /// Which family added this, not who is allowed to read it.
+  ///
+  /// The library is shared: every signed-in household sees, searches, plans
+  /// and reviews every recipe, which is what makes the star averages worth
+  /// anything at this size. This column only decides who may change a recipe
+  /// or take it away again, so one family cannot delete another's cards out
+  /// of a library they both rely on.
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
@@ -188,6 +254,7 @@ model Recipe {
   /// Prisma Client cannot select Unsupported columns; search runs as raw SQL.
   searchVector Unsupported("tsvector")? @map("search_vector")
 
+  @@index([householdId])
   @@index([createdById])
   @@index([createdAt])
   @@index([searchVector], type: Gin)
@@ -254,7 +321,7 @@ model RecipeTag {
 /// liked a dish rather than how many times its keenest fan said so. Cooking it
 /// again and changing your mind edits the review you already left.
 model RecipeReview {
-  id    String @id @default(cuid())
+  id    String  @id @default(cuid())
   /// Whole stars, 1 to 5. Required - a review with no score is a note, and the
   /// range is enforced by a CHECK constraint in the migration as well as here,
   /// because an average is only meaningful if nothing off the scale can reach
@@ -285,8 +352,8 @@ enum MealSlot {
   SNACK
 }
 
-/// One shared household plan rather than a plan per user - the whole point is
-/// that everyone is looking at the same week.
+/// One shared plan per household rather than a plan per user - the whole point
+/// is that everyone in the family is looking at the same week.
 model PlannedMeal {
   id   String   @id @default(cuid())
   /// Midnight UTC on the day the meal is planned for.
@@ -299,10 +366,13 @@ model PlannedMeal {
   servings    Int      @default(4)
   createdAt   DateTime @default(now())
 
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
   recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
-  @@unique([date, slot])
-  @@index([date])
+  @@unique([householdId, date, slot])
+  @@index([householdId, date])
   @@map("planned_meal")
 }
 
@@ -318,13 +388,18 @@ model PantryItem {
   /// As typed, for display.
   name           String
   /// Lower-cased and trimmed, for matching against recipe ingredients. Unique
-  /// outright: a pantry with "Olive Oil" and "olive oil" in it is a bug.
-  normalisedName String   @unique
+  /// within the household: a pantry with "Olive Oil" and "olive oil" in it is
+  /// a bug, but two families both keeping olive oil in is the normal case.
+  normalisedName String
   createdAt      DateTime @default(now())
+
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
+  @@unique([householdId, normalisedName])
   @@index([createdById])
   @@map("pantry_item")
 }
@@ -341,10 +416,13 @@ model WeeklySkip {
   weekStart      DateTime @db.Date
   createdAt      DateTime @default(now())
 
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
-  @@unique([normalisedName, weekStart])
+  @@unique([householdId, normalisedName, weekStart])
   @@index([createdById])
   @@map("weekly_skip")
 }
@@ -367,10 +445,13 @@ model ShoppingHandoff {
   itemCount Int
   createdAt DateTime         @default(now())
 
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
-  @@index([weekStart])
+  @@index([householdId, weekStart])
   @@index([createdById])
   @@map("shopping_handoff")
 }

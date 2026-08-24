@@ -9,7 +9,7 @@ import {
   updateRecipe,
 } from "@/lib/recipe-mutations";
 import { recipeInput, type RecipeInput } from "@/lib/recipe-schema";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -21,7 +21,7 @@ export async function saveRecipeAction(
   raw: unknown,
   existingId?: string,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const parsed = recipeInput.safeParse(raw);
   if (!parsed.success) {
@@ -35,10 +35,13 @@ export async function saveRecipeAction(
 
   let id: string;
   if (existingId) {
-    await updateRecipe(existingId, input);
+    const updated = await updateRecipe(existingId, user.householdId, input);
+    if (!updated) {
+      return { ok: false, error: "That recipe is not in your library." };
+    }
     id = existingId;
   } else {
-    id = await createRecipe(input, user.id);
+    id = await createRecipe(input, user.householdId, user.id);
   }
 
   revalidatePath("/recipes");
@@ -47,8 +50,8 @@ export async function saveRecipeAction(
 }
 
 export async function deleteRecipeAction(id: string): Promise<void> {
-  await requireUser();
-  await deleteRecipe(id);
+  const { householdId } = await requireHousehold();
+  await deleteRecipe(id, householdId);
   revalidatePath("/recipes");
   redirect("/recipes");
 }

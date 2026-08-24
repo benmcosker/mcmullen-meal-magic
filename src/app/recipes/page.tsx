@@ -18,7 +18,7 @@ import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
 import { parseSort } from "@/lib/recipe-sort";
 import { searchRecipes } from "@/lib/recipes";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 /** Enough to characterise a dish; more than this and the card is all labels. */
 const MAX_TAGS_ON_CARD = 3;
@@ -26,7 +26,7 @@ const MAX_TAGS_ON_CARD = 3;
 export default async function RecipesPage({
   searchParams,
 }: PageProps<"/recipes">) {
-  await requireUser();
+  const { householdId } = await requireHousehold();
 
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
@@ -87,13 +87,17 @@ export default async function RecipesPage({
                  * a link, and a button inside an anchor is invalid markup
                  * whose clicks get taken by the navigation.
                  */}
-                <Box sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
-                  <DeleteRecipeButton
-                    id={recipe.id}
-                    title={recipe.title}
-                    compact
-                  />
-                </Box>
+                {recipe.householdId === householdId ? (
+                  <Box
+                    sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}
+                  >
+                    <DeleteRecipeButton
+                      id={recipe.id}
+                      title={recipe.title}
+                      compact
+                    />
+                  </Box>
+                ) : null}
                 {/*
                  * A row on a phone, a tile everywhere else.
                  *

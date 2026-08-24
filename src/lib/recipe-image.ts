@@ -11,12 +11,17 @@ import { deleteFile, storeFile } from "./storage";
  */
 export async function setRecipeImage(
   recipeId: string,
+  householdId: string,
   bytes: Uint8Array,
   filename: string,
   contentType: string,
 ): Promise<string> {
-  const existing = await prisma.recipe.findUnique({
-    where: { id: recipeId },
+  // The photo follows the same rule as the rest of the recipe: anyone may look
+  // at it, only the household who added the recipe may change it. Checked
+  // before the upload rather than after, so no bytes are stored for a write
+  // that was never going to be allowed.
+  const existing = await prisma.recipe.findFirst({
+    where: { id: recipeId, householdId },
     select: { imageUrl: true },
   });
   if (!existing) throw new Error("No such recipe");
@@ -34,9 +39,12 @@ export async function setRecipeImage(
 }
 
 /** Take the photo away, leaving the placeholder in its place. */
-export async function clearRecipeImage(recipeId: string): Promise<void> {
-  const existing = await prisma.recipe.findUnique({
-    where: { id: recipeId },
+export async function clearRecipeImage(
+  recipeId: string,
+  householdId: string,
+): Promise<void> {
+  const existing = await prisma.recipe.findFirst({
+    where: { id: recipeId, householdId },
     select: { imageUrl: true },
   });
   if (!existing?.imageUrl) return;

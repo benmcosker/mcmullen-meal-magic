@@ -170,9 +170,10 @@ export type PlannedMealWithRecipe = Awaited<
  */
 export const PLANNED_SLOT = "DINNER" as const;
 
-export async function getWeekPlan(weekStart: Date) {
+export async function getWeekPlan(weekStart: Date, householdId: string) {
   return prisma.plannedMeal.findMany({
     where: {
+      householdId,
       date: { gte: weekStart, lt: addDays(weekStart, 7) },
       slot: PLANNED_SLOT,
     },
@@ -200,9 +201,10 @@ export type WeeklySkipRecord = {
  */
 export async function getWeeklySkips(
   weekStart: Date,
+  householdId: string,
 ): Promise<WeeklySkipRecord[]> {
   return prisma.weeklySkip.findMany({
-    where: { weekStart },
+    where: { householdId, weekStart },
     orderBy: { name: "asc" },
     select: { id: true, name: true, normalisedName: true },
   });

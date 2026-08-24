@@ -21,7 +21,7 @@ import { ReviewStars } from "@/components/ReviewStars";
 import { getMyReview, listReviews } from "@/lib/reviews";
 import { formatMinutes, formatOvenTemp } from "@/lib/temperature";
 import { getRecipe } from "@/lib/recipes";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 function formatQuantity(quantity: number | null, unit: string | null): string {
   // No rounding: String already gives "2" for 2.0 and keeps 0.25 intact.
@@ -32,7 +32,7 @@ function formatQuantity(quantity: number | null, unit: string | null): string {
 export default async function RecipePage({
   params,
 }: PageProps<"/recipes/[id]">) {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const { id } = await params;
   const recipe = await getRecipe(id);
@@ -43,6 +43,7 @@ export default async function RecipePage({
     getMyReview(recipe.id, user.id),
   ]);
 
+  const mine = recipe.householdId === user.householdId;
   const totalMinutes = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
   const ovenTemp = formatOvenTemp(recipe.ovenTemp, recipe.ovenTempUnit);
   const restTime = formatMinutes(recipe.restMinutes);
@@ -59,16 +60,27 @@ export default async function RecipePage({
         }}
       >
         <Typography variant="h1">{recipe.title}</Typography>
-        <Stack direction="row" spacing={1}>
-          <LinkButton
-            href={`/recipes/${recipe.id}/edit`}
-            startIcon={<EditIcon />}
-            variant="outlined"
-          >
-            Edit
-          </LinkButton>
-          <DeleteRecipeButton id={recipe.id} title={recipe.title} />
-        </Stack>
+        {/*
+         * Everyone reads the library; only the household that added a recipe
+         * can change it. The server enforces that either way.
+         *
+         * Absent rather than disabled for the other households. A greyed-out
+         * Delete says only "not you", where the line at the foot of the page
+         * names the family it does belong to - which is the actual answer, and
+         * worth reading whether or not you were reaching for the button.
+         */}
+        {mine ? (
+          <Stack direction="row" spacing={1}>
+            <LinkButton
+              href={`/recipes/${recipe.id}/edit`}
+              startIcon={<EditIcon />}
+              variant="outlined"
+            >
+              Edit
+            </LinkButton>
+            <DeleteRecipeButton id={recipe.id} title={recipe.title} />
+          </Stack>
+        ) : null}
       </Stack>
 
       {recipe.description ? (
@@ -139,13 +151,18 @@ export default async function RecipePage({
          * Directly under the image it changes, rather than in the edit form.
          * The moment you want a photo is the moment you are looking at the
          * placeholder, and a recipe has to exist before it can have one.
+         *
+         * The photo follows the recipe: only the household that added it can
+         * change the picture everybody else cooks from.
          */}
-        <Box sx={{ mt: 1 }}>
-          <RecipeImageUploader
-            recipeId={recipe.id}
-            hasImage={Boolean(recipe.imageUrl)}
-          />
-        </Box>
+        {mine ? (
+          <Box sx={{ mt: 1 }}>
+            <RecipeImageUploader
+              recipeId={recipe.id}
+              hasImage={Boolean(recipe.imageUrl)}
+            />
+          </Box>
+        ) : null}
       </Box>
 
       <Grid container spacing={3}>
@@ -270,6 +287,7 @@ export default async function RecipePage({
         sx={{ display: "block", mt: 3 }}
       >
         Added by {recipe.createdBy.name}
+        {mine ? null : <> of {recipe.household.name}</>}
         {recipe.sourceName ? <> · From {recipe.sourceName}</> : null}
         {recipe.sourceUrl ? (
           <>

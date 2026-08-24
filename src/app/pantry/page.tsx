@@ -5,12 +5,12 @@ import Typography from "@mui/material/Typography";
 import { AppShell } from "@/components/AppShell";
 import { PantryManager } from "@/components/PantryManager";
 import { listPantryItems } from "@/lib/pantry";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 export default async function PantryPage() {
-  await requireUser();
+  const { householdId } = await requireHousehold();
 
-  const items = await listPantryItems();
+  const items = await listPantryItems(householdId);
 
   return (
     <AppShell>

@@ -147,6 +147,10 @@ const recipeInclude = {
   ingredients: { orderBy: { position: "asc" } },
   tags: { include: { tag: true } },
   createdBy: { select: { id: true, name: true } },
+  // Named on the page rather than only compared against: in a shared library
+  // "whose is this" is the answer to "why can I not edit it", and worth
+  // knowing on its own.
+  household: { select: { name: true } },
   _count: { select: { reviews: true } },
 } satisfies Prisma.RecipeInclude;
 
@@ -194,6 +198,9 @@ export async function searchRecipes(
     .filter((r): r is RecipeWithRelations => r !== undefined);
 }
 
+/**
+ * One recipe. Readable by anyone signed in, whichever household added it.
+ */
 export async function getRecipe(
   id: string,
 ): Promise<RecipeWithRelations | null> {

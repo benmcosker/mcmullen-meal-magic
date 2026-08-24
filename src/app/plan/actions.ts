@@ -6,7 +6,7 @@ import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { aggregateIngredients, getWeekPlan, weekStartOf } from "@/lib/grocery";
 import { getProvider, type HandoffResult } from "@/lib/shopping";
-import { requireUser } from "@/lib/session";
+import { requireHousehold } from "@/lib/session";
 
 export async function setPlannedMealAction(input: {
   date: string;
@@ -14,17 +14,32 @@ export async function setPlannedMealAction(input: {
   recipeId: string | null;
   servings: number;
 }): Promise<void> {
-  await requireUser();
+  const { householdId } = await requireHousehold();
 
   const date = new Date(`${input.date}T00:00:00.000Z`);
 
   if (!input.recipeId) {
     // Clearing a slot: delete rather than storing an empty row.
-    await prisma.plannedMeal.deleteMany({ where: { date, slot: input.slot } });
+    await prisma.plannedMeal.deleteMany({
+      where: { householdId, date, slot: input.slot },
+    });
   } else {
+    // Any recipe in the library can be planned, whoever added it - that is
+    // what sharing the library is for. It still has to exist: the id comes
+    // from a form post, and a planned meal pointing at nothing shows up as a
+    // blank evening rather than an error.
+    const recipe = await prisma.recipe.findUnique({
+      where: { id: input.recipeId },
+      select: { id: true },
+    });
+    if (!recipe) return;
+
     await prisma.plannedMeal.upsert({
-      where: { date_slot: { date, slot: input.slot } },
+      where: {
+        householdId_date_slot: { householdId, date, slot: input.slot },
+      },
       create: {
+        householdId,
         date,
         slot: input.slot,
         recipeId: input.recipeId,
@@ -49,10 +64,10 @@ export async function sendWeekToProviderAction(
   weekStartIso: string,
   providerId: ShoppingProvider,
 ): Promise<HandoffResult> {
-  const user = await requireUser();
+  const user = await requireHousehold();
 
   const weekStart = weekStartOf(new Date(weekStartIso));
-  const meals = await getWeekPlan(weekStart);
+  const meals = await getWeekPlan(weekStart, user.householdId);
   const lines = aggregateIngredients(meals);
 
   if (lines.length === 0) {
@@ -73,6 +88,7 @@ export async function sendWeekToProviderAction(
       weekStart,
       url: result.kind === "cart" ? result.url : null,
       itemCount: lines.length,
+      householdId: user.householdId,
       createdById: user.id,
     },
   });

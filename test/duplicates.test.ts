@@ -9,6 +9,8 @@ import {
 import { createRecipe } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
 
+import { makeHousehold, resetDatabase as reset } from "./support/db";
+
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const bytes = (text: string) => new TextEncoder().encode(text);
@@ -29,19 +31,11 @@ describe("hashBytes", () => {
 
 describe.skipIf(!hasDb)("duplicate detection", () => {
   let userId: string;
+  let householdId: string;
 
   beforeEach(async () => {
     await reset();
-    const user = await prisma.user.create({
-      data: {
-        id: "dup-user",
-        name: "Cook",
-        email: "dup@example.com",
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
-    userId = user.id;
+    ({ householdId, userId } = await makeHousehold());
   });
 
   afterAll(async () => {
@@ -57,6 +51,7 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
         ingredients: [],
         tags: [],
       }),
+      householdId,
       userId,
       pdfSha256 ? { source: "PDF", pdfSha256 } : {},
     );
@@ -124,7 +119,9 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
     it("can exclude a recipe from its own results", async () => {
       const id = await add("Chicken Piccata");
       expect(
-        await findSimilarlyTitled("Chicken Piccata", { excludeId: id }),
+        await findSimilarlyTitled("Chicken Piccata", {
+          excludeId: id,
+        }),
       ).toEqual([]);
     });
 
@@ -134,18 +131,3 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
     });
   });
 });
-
-async function reset() {
-  await prisma.recipeTag.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.pantryItem.deleteMany();
-  await prisma.weeklySkip.deleteMany();
-  await prisma.plannedMeal.deleteMany();
-  await prisma.shoppingHandoff.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.invite.deleteMany();
-  await prisma.user.deleteMany();
-}
