@@ -44,12 +44,12 @@ const KIND_COPY: Record<InviteKind, { label: string; detail: string }> = {
   family: {
     label: "To the family",
     detail:
-      "They join this household. Same recipes, same weekly plan, same shopping list, and they can change all of it.",
+      "They join this household - the same weekly plan, the same pantry and the same shopping list, and they can change all of it.",
   },
   outside: {
     label: "Outside the family",
     detail:
-      "They get a household of their own, starting empty. Nothing is shared in either direction - they will not see your recipes and you will not see theirs.",
+      "They start a household of their own, with its own plan and shopping list. The recipe library is shared either way: everyone signed in reads and rates the same recipes.",
   },
 };
 
@@ -70,7 +70,7 @@ export function HouseholdManager({
     <Stack spacing={3}>
       <HouseholdName current={householdName} maxLength={maxNameLength} />
       <Members members={members} householdName={householdName} />
-      <InviteForm inviteDays={inviteDays} />
+      <InviteForm inviteDays={inviteDays} maxNameLength={maxNameLength} />
       {invites.length > 0 ? <PendingInvites invites={invites} /> : null}
     </Stack>
   );
@@ -165,9 +165,16 @@ function Members({
   );
 }
 
-function InviteForm({ inviteDays }: { inviteDays: number }) {
+function InviteForm({
+  inviteDays,
+  maxNameLength,
+}: {
+  inviteDays: number;
+  maxNameLength: number;
+}) {
   const [kind, setKind] = useState<InviteKind>("family");
   const [email, setEmail] = useState("");
+  const [newHousehold, setNewHousehold] = useState("");
   const [created, setCreated] = useState<CreatedInvite | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -178,10 +185,11 @@ function InviteForm({ inviteDays }: { inviteDays: number }) {
     setCreated(null);
 
     startTransition(async () => {
-      const result = await createInviteAction(kind, email);
+      const result = await createInviteAction(kind, email, newHousehold);
       if (result.ok) {
         setCreated(result.invite);
         setEmail("");
+        setNewHousehold("");
       } else {
         setError(result.error);
       }
@@ -213,19 +221,34 @@ function InviteForm({ inviteDays }: { inviteDays: number }) {
           {KIND_COPY[kind].detail}
         </Typography>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <TextField
-            label="Their email (optional)"
-            placeholder="Pins the code to one address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            fullWidth
-            size="small"
-          />
-          <Button type="submit" variant="contained" disabled={pending}>
-            Create code
-          </Button>
+        <Stack spacing={1.5}>
+          {kind === "outside" ? (
+            <TextField
+              label="Name their household (optional)"
+              placeholder="The Smiths"
+              value={newHousehold}
+              onChange={(e) => setNewHousehold(e.target.value)}
+              slotProps={{ htmlInput: { maxLength: maxNameLength } }}
+              helperText="What their family will be called. Left blank, it takes their own name."
+              fullWidth
+              size="small"
+            />
+          ) : null}
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <TextField
+              label="Their email (optional)"
+              placeholder="Pins the code to one address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              fullWidth
+              size="small"
+            />
+            <Button type="submit" variant="contained" disabled={pending}>
+              Create code
+            </Button>
+          </Stack>
         </Stack>
 
         {error ? (
@@ -239,7 +262,9 @@ function InviteForm({ inviteDays }: { inviteDays: number }) {
             <Typography variant="body2" sx={{ mb: 1 }}>
               {created.kind === "family"
                 ? "This code joins your household."
-                : "This code starts a household of their own."}{" "}
+                : created.householdName
+                  ? `This code starts ${created.householdName}.`
+                  : "This code starts a household of their own."}{" "}
               It works once, and expires in {inviteDays} days.
             </Typography>
             <Typography

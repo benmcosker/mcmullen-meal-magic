@@ -44,7 +44,7 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
 
   it("creates a recipe that is immediately searchable", async () => {
     await createRecipe(recipeInput.parse(base), householdId, userId);
-    const found = await searchRecipes({ householdId, query: "miso" });
+    const found = await searchRecipes({ query: "miso" });
     expect(found.map((r) => r.title)).toEqual(["Miso Butter Salmon"]);
   });
 
@@ -72,7 +72,7 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
       userId,
     );
 
-    const tags = await listTagsWithCounts(householdId);
+    const tags = await listTagsWithCounts();
     expect(tags.find((t) => t.name === "Weeknight")?.count).toBe(2);
     expect(await prisma.tag.count({ where: { slug: "weeknight" } })).toBe(1);
   });
@@ -107,16 +107,14 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
       recipeInput.parse({ ...base, title: "Miso Butter Cod" }),
     );
 
-    expect(
-      (await searchRecipes({ householdId, query: "cod" })).map((r) => r.title),
-    ).toEqual(["Miso Butter Cod"]);
+    expect((await searchRecipes({ query: "cod" })).map((r) => r.title)).toEqual(
+      ["Miso Butter Cod"],
+    );
     // The edit changed only the title, so the untouched "salmon fillet"
     // ingredient still matches - the index tracks the current row, not the
     // words the recipe was created with.
     expect(
-      (await searchRecipes({ householdId, query: "salmon" })).map(
-        (r) => r.title,
-      ),
+      (await searchRecipes({ query: "salmon" })).map((r) => r.title),
     ).toEqual(["Miso Butter Cod"]);
 
     // Renaming away from a word does drop it, when nothing else supplies it.
@@ -129,7 +127,7 @@ describe.skipIf(!hasDb)("recipe mutations", () => {
         ingredients: [{ name: "cod fillet", quantity: 2, unit: null }],
       }),
     );
-    expect(await searchRecipes({ householdId, query: "salmon" })).toEqual([]);
+    expect(await searchRecipes({ query: "salmon" })).toEqual([]);
   });
 
   it("removes ingredients and tag links when the recipe is deleted", async () => {

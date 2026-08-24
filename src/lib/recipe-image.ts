@@ -16,9 +16,10 @@ export async function setRecipeImage(
   filename: string,
   contentType: string,
 ): Promise<string> {
-  // Scoped by household, and checked before the upload rather than after: a
-  // recipe belonging to another family is not found, and no bytes are stored
-  // for a write that was never going to be allowed.
+  // The photo follows the same rule as the rest of the recipe: anyone may look
+  // at it, only the household who added the recipe may change it. Checked
+  // before the upload rather than after, so no bytes are stored for a write
+  // that was never going to be allowed.
   const existing = await prisma.recipe.findFirst({
     where: { id: recipeId, householdId },
     select: { imageUrl: true },

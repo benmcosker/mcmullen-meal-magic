@@ -12,6 +12,8 @@ export type CreatedInvite = {
   code: string;
   expiresAt: string;
   kind: InviteKind;
+  /** The name the new household will take, when the sender chose one. */
+  householdName: string | null;
 };
 
 export type InviteResult =
@@ -29,6 +31,7 @@ export type InviteResult =
 export async function createInviteAction(
   kind: InviteKind,
   email?: string,
+  householdName?: string,
 ): Promise<InviteResult> {
   const user = await requireHousehold();
 
@@ -40,6 +43,7 @@ export async function createInviteAction(
   const invite = await createInvite({
     createdById: user.id,
     householdId: kind === "family" ? user.householdId : null,
+    householdName: kind === "outside" ? householdName : null,
     email: trimmed || null,
   });
 
@@ -50,6 +54,7 @@ export async function createInviteAction(
       code: invite.code,
       expiresAt: invite.expiresAt.toISOString(),
       kind,
+      householdName: kind === "outside" ? householdName?.trim() || null : null,
     },
   };
 }

@@ -13,7 +13,7 @@ import {
   updateRecipe,
 } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
-import { getRecipe, searchRecipeIds, searchRecipes } from "@/lib/recipes";
+import { getRecipe, searchRecipes } from "@/lib/recipes";
 import { getReviewSummary, saveReview } from "@/lib/reviews";
 
 import { makeHousehold, makeUser, resetDatabase as reset } from "./support/db";
@@ -66,93 +66,66 @@ describe.skipIf(!hasDb)("two households", () => {
       extra,
     );
 
-  describe("the library", () => {
-    it("shows each household only its own recipes", async () => {
+  describe("the shared library", () => {
+    it("shows every household every recipe", async () => {
       await add(ours, "Our Piccata");
       await add(theirs, "Their Dahl");
 
-      expect(
-        (await searchRecipes({ householdId: ours.householdId })).map(
-          (r) => r.title,
-        ),
-      ).toEqual(["Our Piccata"]);
-      expect(
-        (await searchRecipes({ householdId: theirs.householdId })).map(
-          (r) => r.title,
-        ),
-      ).toEqual(["Their Dahl"]);
-    });
-
-    it("filters in the query, not only when hydrating the rows", async () => {
-      // searchRecipes re-checks the household when it loads the rows, so it
-      // stays correct even if the SQL forgets to. searchRecipeIds is where the
-      // ranking and the LIMIT are applied, though, and a filter missing there
-      // would quietly cost a household rows off the end of its own list. So
-      // this goes at the ranking layer directly rather than through the
-      // hydrated call.
-      await add(theirs, "Their Dahl");
-      await add(ours, "Our Piccata");
-
-      const ids = await searchRecipeIds({ householdId: ours.householdId });
-      expect(ids).toHaveLength(1);
-
-      const [mine] = await searchRecipes({ householdId: ours.householdId });
-      expect(ids[0].id).toBe(mine.id);
-    });
-
-    it("filters in the text-search query too", async () => {
-      // The two branches are separate SQL statements, and only this one runs
-      // when there is something in the search box.
-      await add(theirs, "Chicken Piccata");
-      await add(ours, "Chicken Piccata");
-
-      const ids = await searchRecipeIds({
-        householdId: ours.householdId,
-        query: "chicken",
-      });
-      expect(ids).toHaveLength(1);
-    });
-
-    it("does not spend a page of results on another household", async () => {
-      // What a missing filter in the SQL actually costs: the LIMIT is applied
-      // before the rows are checked, so a household asking for two recipes
-      // gets back however many of the first two happened to be its own.
-      await add(theirs, "Their One");
-      await add(theirs, "Their Two");
-      await add(ours, "Our One");
-      await add(ours, "Our Two");
-
-      const page = await searchRecipes({
-        householdId: ours.householdId,
-        limit: 2,
-      });
-      expect(page.map((r) => r.title).sort()).toEqual(["Our One", "Our Two"]);
-    });
-
-    it("does not turn up another household's recipe in a search", async () => {
-      await add(theirs, "Their Dahl");
-
-      // Matches on title, ingredient and tag alike - every branch of the query
-      // has to carry the household, not just the one the first test happened
-      // to exercise.
-      for (const query of ["dahl", "butter", "weeknight"]) {
-        expect(
-          await searchRecipes({ householdId: ours.householdId, query }),
-        ).toEqual([]);
+      // The library is a commons. What is private is the week - the plan, the
+      // pantry, the shopping list - not the recipes themselves.
+      for (const household of [ours, theirs]) {
+        expect((await searchRecipes()).map((r) => r.title).sort()).toEqual([
+          "Our Piccata",
+          "Their Dahl",
+        ]);
+        expect(household).toBeTruthy();
       }
     });
 
-    it("answers 'not found' for another household's recipe by id", async () => {
-      const id = await add(theirs, "Their Dahl");
+    it("finds another household's recipe by search", async () => {
+      await add(theirs, "Their Dahl");
 
-      // Not "forbidden": that would confirm the recipe exists. A household
-      // should not be able to learn anything about another's library, the
-      // size of it included.
-      expect(await getRecipe(id, ours.householdId)).toBeNull();
-      expect(await getRecipe(id, theirs.householdId)).not.toBeNull();
+      for (const query of ["dahl", "butter", "weeknight"]) {
+        expect(await searchRecipes({ query })).toHaveLength(1);
+      }
     });
 
-    it("refuses to edit or delete another household's recipe", async () => {
+    it("opens another household's recipe by id", async () => {
+      const id = await add(theirs, "Their Dahl");
+      expect((await getRecipe(id))?.title).toBe("Their Dahl");
+    });
+
+    it("counts tags across the whole library", async () => {
+      await add(ours, "Our Piccata");
+      await add(theirs, "Their Dahl");
+
+      expect(
+        (await listTagsWithCounts()).map((t) => [t.name, t.count]),
+      ).toEqual([["Weeknight", 2]]);
+    });
+
+    it("recognises a card somebody else already uploaded", async () => {
+      // Shared library, so a duplicate is a duplicate for everyone: there is
+      // no point in a second copy of a recipe already sitting there.
+      const pdfSha256 = "a".repeat(64);
+      await add(theirs, "Piccata", { source: "PDF", pdfSha256 });
+
+      expect((await findRecipeByPdfHash(pdfSha256))?.title).toBe("Piccata");
+      await expect(
+        add(ours, "Piccata", { source: "PDF", pdfSha256 }),
+      ).rejects.toThrow();
+    });
+
+    it("warns about a similar title whoever added it", async () => {
+      await add(theirs, "Chicken Piccata");
+      expect(await findSimilarlyTitled("Chicken Piccata")).toHaveLength(1);
+    });
+  });
+
+  describe("who may change a recipe", () => {
+    it("refuses to edit a recipe another household added", async () => {
+      // Everyone reads the library; only the family who put a card in it can
+      // reword the card everybody else cooks from.
       const id = await add(theirs, "Their Dahl");
 
       const edited = await updateRecipe(
@@ -166,66 +139,35 @@ describe.skipIf(!hasDb)("two households", () => {
         }),
       );
       expect(edited).toBe(false);
+      expect((await getRecipe(id))?.title).toBe("Their Dahl");
+    });
+
+    it("refuses to delete a recipe another household added", async () => {
+      // A delete is not a private act here: it takes the recipe away from
+      // everybody, including whoever planned it for Thursday.
+      const id = await add(theirs, "Their Dahl");
+
       expect(await deleteRecipe(id, ours.householdId)).toBe(false);
-
-      const survivor = await getRecipe(id, theirs.householdId);
-      expect(survivor?.title).toBe("Their Dahl");
+      expect(await getRecipe(id)).not.toBeNull();
     });
 
-    it("counts tags only within the household", async () => {
-      await add(ours, "Our Piccata");
-      await add(theirs, "Their Dahl");
-      await add(theirs, "Their Soup");
-
-      const ourTags = await listTagsWithCounts(ours.householdId);
-      expect(ourTags.map((t) => [t.name, t.count])).toEqual([["Weeknight", 1]]);
-
-      const theirTags = await listTagsWithCounts(theirs.householdId);
-      expect(theirTags.map((t) => [t.name, t.count])).toEqual([
-        ["Weeknight", 2],
-      ]);
-    });
-
-    it("drops a tag from the bar when only another household uses it", async () => {
-      await add(theirs, "Their Dahl");
-      expect(await listTagsWithCounts(ours.householdId)).toEqual([]);
-    });
-  });
-
-  describe("duplicate detection", () => {
-    it("lets both households own a copy of the same recipe card", async () => {
-      const pdfSha256 = "a".repeat(64);
-      await add(ours, "Piccata", { source: "PDF", pdfSha256 });
-
-      // The unique index is now (household, hash). If it were still on the
-      // hash alone this would throw, and the second family could never upload
-      // a card the first already had.
-      await expect(
-        add(theirs, "Piccata", { source: "PDF", pdfSha256 }),
-      ).resolves.toBeTruthy();
-    });
-
-    it("still recognises the household's own second upload", async () => {
-      const pdfSha256 = "b".repeat(64);
-      await add(ours, "Piccata", { source: "PDF", pdfSha256 });
+    it("lets the household that added it edit and delete it", async () => {
+      const id = await add(ours, "Our Piccata");
 
       expect(
-        (await findRecipeByPdfHash(pdfSha256, ours.householdId))?.title,
-      ).toBe("Piccata");
-      expect(
-        await findRecipeByPdfHash(pdfSha256, theirs.householdId),
-      ).toBeNull();
-    });
-
-    it("does not warn about a similar title in another household", async () => {
-      await add(theirs, "Chicken Piccata");
-
-      expect(
-        await findSimilarlyTitled("Chicken Piccata", ours.householdId),
-      ).toEqual([]);
-      expect(
-        await findSimilarlyTitled("Chicken Piccata", theirs.householdId),
-      ).toHaveLength(1);
+        await updateRecipe(
+          id,
+          ours.householdId,
+          recipeInput.parse({
+            title: "Our Better Piccata",
+            instructions: ["Cook"],
+            ingredients: [],
+            tags: [],
+          }),
+        ),
+      ).toBe(true);
+      expect((await getRecipe(id))?.title).toBe("Our Better Piccata");
+      expect(await deleteRecipe(id, ours.householdId)).toBe(true);
     });
   });
 
@@ -310,31 +252,29 @@ describe.skipIf(!hasDb)("two households", () => {
   });
 
   describe("reviews", () => {
-    it("refuses a review on another household's recipe", async () => {
-      const id = await add(theirs, "Their Dahl");
+    it("pools opinions from every household on one recipe", async () => {
+      // The whole reason the library is shared: an average over one family's
+      // three verdicts says much less than one over everybody who cooked it.
+      const id = await add(ours, "Our Piccata");
 
-      await expect(
-        saveReview(id, ours.householdId, ours.userId, {
-          stars: 1,
-          body: null,
-        }),
-      ).rejects.toThrow(/No such recipe/);
+      await saveReview(id, ours.userId, { stars: 5, body: null });
+      await saveReview(id, theirs.userId, { stars: 3, body: null });
 
-      expect(await getReviewSummary(id)).toEqual({ average: null, count: 0 });
+      expect(await getReviewSummary(id)).toEqual({ average: 4, count: 2 });
     });
 
-    it("still lets every member of one household review its recipes", async () => {
+    it("still refuses a review on a recipe that does not exist", async () => {
+      await expect(
+        saveReview("no-such-recipe", ours.userId, { stars: 1, body: null }),
+      ).rejects.toThrow(/No such recipe/);
+    });
+
+    it("lets every member of a household review its own recipes", async () => {
       const id = await add(ours, "Our Piccata");
       const partner = await makeUser(ours.householdId);
 
-      await saveReview(id, ours.householdId, ours.userId, {
-        stars: 5,
-        body: null,
-      });
-      await saveReview(id, ours.householdId, partner, {
-        stars: 3,
-        body: null,
-      });
+      await saveReview(id, ours.userId, { stars: 5, body: null });
+      await saveReview(id, partner, { stars: 3, body: null });
 
       expect(await getReviewSummary(id)).toEqual({ average: 4, count: 2 });
     });
@@ -371,8 +311,9 @@ describe.skipIf(!hasDb)("two households", () => {
       expect(placed?.household?.name).toBe("Dana's Household");
     });
 
-    it("shares nothing with the household that sent the outside invite", async () => {
+    it("shares the library but not the week with an outside invite", async () => {
       await add(ours, "Our Piccata");
+      await addPantryItem("Gochujang", ours.householdId, ours.userId);
 
       const { code } = await createInvite({
         createdById: ours.userId,
@@ -385,9 +326,73 @@ describe.skipIf(!hasDb)("two households", () => {
         where: { id: stranger },
         select: { householdId: true },
       });
-      expect(
-        await searchRecipes({ householdId: placed!.householdId! }),
-      ).toEqual([]);
+
+      // They see the recipe, because everyone does.
+      expect((await searchRecipes()).map((r) => r.title)).toContain(
+        "Our Piccata",
+      );
+      // They do not inherit the pantry, and so not the shopping list either.
+      expect(await listPantryItems(placed!.householdId!)).toEqual([]);
+    });
+
+    it("names the new household when the sender chose a name", async () => {
+      const { code } = await createInvite({
+        createdById: ours.userId,
+        householdId: null,
+        householdName: "The Smiths",
+      });
+
+      const smith = await newAccount("smith", "Pat");
+      await redeemInvite(code, smith);
+
+      const placed = await prisma.user.findUnique({
+        where: { id: smith },
+        select: { household: { select: { name: true } } },
+      });
+      expect(placed?.household?.name).toBe("The Smiths");
+    });
+
+    it("falls back to the redeemer's name when the sender left it blank", async () => {
+      const { code } = await createInvite({
+        createdById: ours.userId,
+        householdId: null,
+        householdName: "   ",
+      });
+
+      const pat = await newAccount("pat", "Pat");
+      await redeemInvite(code, pat);
+
+      const placed = await prisma.user.findUnique({
+        where: { id: pat },
+        select: { household: { select: { name: true } } },
+      });
+      expect(placed?.household?.name).toBe("Pat's Household");
+    });
+
+    it("ignores a name on a family invite, which already has one", async () => {
+      const { code } = await createInvite({
+        createdById: ours.userId,
+        householdId: ours.householdId,
+        householdName: "Something Else",
+      });
+
+      // Not merely unused at redemption - never stored. A name sitting on a
+      // family invite would read, to anyone looking at the row later, as a
+      // household that code was going to create.
+      const stored = await prisma.invite.findUnique({
+        where: { code },
+        select: { householdName: true },
+      });
+      expect(stored?.householdName).toBeNull();
+
+      const joiner = await newAccount("joiner-named");
+      await redeemInvite(code, joiner);
+
+      const placed = await prisma.user.findUnique({
+        where: { id: joiner },
+        select: { household: { select: { name: true } } },
+      });
+      expect(placed?.household?.name).toBe("Ours");
     });
 
     it("says which family a code joins before it is redeemed", async () => {

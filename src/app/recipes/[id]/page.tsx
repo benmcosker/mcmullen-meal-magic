@@ -35,7 +35,7 @@ export default async function RecipePage({
   const user = await requireHousehold();
 
   const { id } = await params;
-  const recipe = await getRecipe(id, user.householdId);
+  const recipe = await getRecipe(id);
   if (!recipe) notFound();
 
   const [reviews, myReview] = await Promise.all([
@@ -59,16 +59,23 @@ export default async function RecipePage({
         }}
       >
         <Typography variant="h1">{recipe.title}</Typography>
-        <Stack direction="row" spacing={1}>
-          <LinkButton
-            href={`/recipes/${recipe.id}/edit`}
-            startIcon={<EditIcon />}
-            variant="outlined"
-          >
-            Edit
-          </LinkButton>
-          <DeleteRecipeButton id={recipe.id} title={recipe.title} />
-        </Stack>
+        {/*
+         * Everyone reads the library; only the household that added a recipe
+         * can change it. The server enforces that either way - this is so the
+         * other households are not offered a button that would refuse them.
+         */}
+        {recipe.householdId === user.householdId ? (
+          <Stack direction="row" spacing={1}>
+            <LinkButton
+              href={`/recipes/${recipe.id}/edit`}
+              startIcon={<EditIcon />}
+              variant="outlined"
+            >
+              Edit
+            </LinkButton>
+            <DeleteRecipeButton id={recipe.id} title={recipe.title} />
+          </Stack>
+        ) : null}
       </Stack>
 
       {recipe.description ? (

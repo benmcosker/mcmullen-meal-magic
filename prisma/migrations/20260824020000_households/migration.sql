@@ -1,10 +1,16 @@
--- Households: the unit everything is scoped to.
+-- Households: the unit the weekly cooking is scoped to.
 --
 -- The app was built as one family with the scoping left implicit - one plan,
 -- one pantry, and a unique constraint on (date, slot) meaning there was exactly
 -- one Tuesday dinner in the entire database. This migration makes that unit a
 -- real record so a second family can use the app without colliding with the
 -- first.
+--
+-- The recipe library stays shared. Every household reads, searches, plans and
+-- reviews the whole of it; a recipe carries a household only so that the family
+-- who added it is the family who can change or remove it. What is private is
+-- the week: the plan, the pantry, this week's skips, and the shopping handed to
+-- a shop.
 --
 -- Written by hand rather than generated. The generated version adds the
 -- household columns as NOT NULL in one step, which fails outright on any
@@ -24,6 +30,7 @@ CREATE TABLE "household" (
 -- AlterTable: nullable for now, so existing rows survive the addition.
 ALTER TABLE "user" ADD COLUMN "householdId" TEXT;
 ALTER TABLE "invite" ADD COLUMN "householdId" TEXT;
+ALTER TABLE "invite" ADD COLUMN "householdName" TEXT;
 ALTER TABLE "recipe" ADD COLUMN "householdId" TEXT;
 ALTER TABLE "planned_meal" ADD COLUMN "householdId" TEXT;
 ALTER TABLE "pantry_item" ADD COLUMN "householdId" TEXT;
@@ -69,8 +76,9 @@ ALTER TABLE "weekly_skip" ALTER COLUMN "householdId" SET NOT NULL;
 ALTER TABLE "shopping_handoff" ALTER COLUMN "householdId" SET NOT NULL;
 
 -- The constraints that made the app single-family. Each gains the household, so
--- two families can plan the same Tuesday, keep the same staple in the pantry,
--- and own a copy of the same recipe card.
+-- two families can plan the same Tuesday and keep the same staple in the pantry.
+-- The recipe hash is deliberately not among them: the library is shared, so a
+-- card somebody has already uploaded is already there for everybody.
 DROP INDEX "planned_meal_date_slot_key";
 CREATE UNIQUE INDEX "planned_meal_householdId_date_slot_key" ON "planned_meal"("householdId", "date", "slot");
 
@@ -80,20 +88,16 @@ CREATE UNIQUE INDEX "pantry_item_householdId_normalisedName_key" ON "pantry_item
 DROP INDEX "weekly_skip_normalisedName_weekStart_key";
 CREATE UNIQUE INDEX "weekly_skip_householdId_normalisedName_weekStart_key" ON "weekly_skip"("householdId", "normalisedName", "weekStart");
 
--- Postgres treats NULLs as distinct in a composite unique just as it does in a
--- single-column one, so hand-typed recipes carrying no hash still coexist
--- freely while one PDF can only produce one recipe per household.
-DROP INDEX "recipe_pdfSha256_key";
-CREATE UNIQUE INDEX "recipe_householdId_pdfSha256_key" ON "recipe"("householdId", "pdfSha256");
-
--- Lookups are all household-scoped now, so the indexes lead with it.
+-- Lookups on the week are all household-scoped now, so those indexes lead with
+-- it. The recipe index serves the ownership check on edit and delete; reading
+-- the library is unfiltered and goes on using the indexes it always did.
 DROP INDEX "planned_meal_date_idx";
 CREATE INDEX "planned_meal_householdId_date_idx" ON "planned_meal"("householdId", "date");
 
 DROP INDEX "shopping_handoff_weekStart_idx";
 CREATE INDEX "shopping_handoff_householdId_weekStart_idx" ON "shopping_handoff"("householdId", "weekStart");
 
-CREATE INDEX "recipe_householdId_createdAt_idx" ON "recipe"("householdId", "createdAt");
+CREATE INDEX "recipe_householdId_idx" ON "recipe"("householdId");
 CREATE INDEX "user_householdId_idx" ON "user"("householdId");
 CREATE INDEX "invite_householdId_idx" ON "invite"("householdId");
 

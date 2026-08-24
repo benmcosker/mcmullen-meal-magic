@@ -74,7 +74,7 @@ describe.skipIf(!hasDb)("recipe search", () => {
   });
 
   const titles = async (options: Partial<RecipeSearchOptions> = {}) =>
-    (await searchRecipes({ householdId, ...options })).map((r) => r.title);
+    (await searchRecipes({ ...options })).map((r) => r.title);
 
   it("matches a word in the title", async () => {
     expect(await titles({ query: "piccata" })).toEqual(["Chicken Piccata"]);

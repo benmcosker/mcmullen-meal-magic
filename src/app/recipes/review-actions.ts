@@ -10,11 +10,10 @@ import { requireHousehold } from "@/lib/session";
 import type { ActionResult } from "./actions";
 
 /**
- * Reviewing is open to every member of the household, on every recipe in it -
- * the same rule as reading the library. Who uploaded the dish is deliberately
- * not checked, or that person would be the only one unable to hear what
- * anybody thought of it. The household is checked, in `saveReview`, because
- * the recipe id arrives from the client.
+ * Reviewing is open to everybody signed in, on every recipe in the library -
+ * the same rule as reading it. Neither who uploaded the dish nor which
+ * household they are in is checked, or the pool of opinions the average is
+ * drawn from would be three people rather than everyone who has cooked it.
  */
 
 /** The list card and the planner tile both show the average, so both go stale. */
@@ -32,7 +31,7 @@ export async function saveReviewAction(
   const user = await requireHousehold();
 
   try {
-    await saveReview(recipeId, user.householdId, user.id, input);
+    await saveReview(recipeId, user.id, input);
   } catch (error) {
     return {
       ok: false,

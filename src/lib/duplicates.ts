@@ -18,10 +18,9 @@ export function hashBytes(bytes: Uint8Array): string {
  */
 export async function findRecipeByPdfHash(
   pdfSha256: string,
-  householdId: string,
 ): Promise<ExistingRecipe | null> {
   return prisma.recipe.findUnique({
-    where: { householdId_pdfSha256: { householdId, pdfSha256 } },
+    where: { pdfSha256 },
     select: { id: true, title: true },
   });
 }
@@ -49,7 +48,6 @@ export const TITLE_SIMILARITY_THRESHOLD = 0.55;
  */
 export async function findSimilarlyTitled(
   title: string,
-  householdId: string,
   options: { excludeId?: string; limit?: number } = {},
 ): Promise<ExistingRecipe[]> {
   const trimmed = title.trim();
@@ -60,8 +58,7 @@ export async function findSimilarlyTitled(
   >`
     SELECT "id", "title", similarity("title", ${trimmed})::float8 AS score
     FROM "recipe"
-    WHERE "householdId" = ${householdId}
-      AND similarity("title", ${trimmed}) >= ${TITLE_SIMILARITY_THRESHOLD}
+    WHERE similarity("title", ${trimmed}) >= ${TITLE_SIMILARITY_THRESHOLD}
       AND ("id" <> ${options.excludeId ?? ""})
     ORDER BY score DESC
     LIMIT ${options.limit ?? 3}

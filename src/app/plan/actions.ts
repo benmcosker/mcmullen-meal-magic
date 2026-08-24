@@ -24,13 +24,12 @@ export async function setPlannedMealAction(input: {
       where: { householdId, date, slot: input.slot },
     });
   } else {
-    // The recipe id arrives from a form post, so it is checked against the
-    // household before it can be planned. Without this, a recipe belonging to
-    // another family could be booked into this week - and its ingredients
-    // would then turn up on this household's shopping list, which is a leak
-    // by way of the grocery aggregate rather than by way of the library.
-    const recipe = await prisma.recipe.findFirst({
-      where: { id: input.recipeId, householdId },
+    // Any recipe in the library can be planned, whoever added it - that is
+    // what sharing the library is for. It still has to exist: the id comes
+    // from a form post, and a planned meal pointing at nothing shows up as a
+    // blank evening rather than an error.
+    const recipe = await prisma.recipe.findUnique({
+      where: { id: input.recipeId },
       select: { id: true },
     });
     if (!recipe) return;

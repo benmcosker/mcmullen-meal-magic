@@ -50,9 +50,9 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("averages the stars from every review", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(recipeId, householdId, bob, { stars: 4 });
-      await saveReview(recipeId, householdId, carol, { stars: 3 });
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(recipeId, bob, { stars: 4 });
+      await saveReview(recipeId, carol, { stars: 3 });
 
       expect(await getReviewSummary(recipeId)).toEqual({
         average: 4,
@@ -62,19 +62,19 @@ describe.skipIf(!hasDb)("reviews", () => {
 
     it("rounds to one decimal place rather than implying false precision", async () => {
       // 5, 4, 4 averages to 4.333...
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(recipeId, householdId, bob, { stars: 4 });
-      await saveReview(recipeId, householdId, carol, { stars: 4 });
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(recipeId, bob, { stars: 4 });
+      await saveReview(recipeId, carol, { stars: 4 });
 
       expect((await getReviewSummary(recipeId)).average).toBe(4.3);
     });
 
     it("counts a review whether or not it carries words", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 5,
         body: "Excellent.",
       });
-      await saveReview(recipeId, householdId, bob, { stars: 1 });
+      await saveReview(recipeId, bob, { stars: 1 });
 
       expect(await getReviewSummary(recipeId)).toEqual({
         average: 3,
@@ -85,13 +85,13 @@ describe.skipIf(!hasDb)("reviews", () => {
     it("counts each person once, however many times they revise", async () => {
       // The failure this guards against: one enthusiast re-reviewing a dish
       // repeatedly and outvoting the rest of the household.
-      await saveReview(recipeId, householdId, alice, { stars: 1 });
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, { stars: 1 });
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(recipeId, alice, {
         stars: 5,
         body: "Still great.",
       });
-      await saveReview(recipeId, householdId, bob, { stars: 1 });
+      await saveReview(recipeId, bob, { stars: 1 });
 
       expect(await getReviewSummary(recipeId)).toEqual({
         average: 3,
@@ -100,8 +100,8 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("drops a withdrawn review out of the average entirely", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(recipeId, householdId, bob, { stars: 1 });
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(recipeId, bob, { stars: 1 });
       await deleteReview(recipeId, bob);
 
       expect(await getReviewSummary(recipeId)).toEqual({
@@ -111,7 +111,7 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("treats withdrawing as different from awarding one star", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 1 });
+      await saveReview(recipeId, alice, { stars: 1 });
       expect((await getReviewSummary(recipeId)).count).toBe(1);
 
       await deleteReview(recipeId, alice);
@@ -123,8 +123,8 @@ describe.skipIf(!hasDb)("reviews", () => {
 
     it("keeps each recipe's reviews to itself", async () => {
       const other = await addRecipe("Lentil Dahl", householdId, alice);
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(other, householdId, alice, { stars: 1 });
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(other, alice, { stars: 1 });
 
       const summaries = await getReviewSummaries([recipeId, other]);
       expect(summaries.get(recipeId)?.average).toBe(5);
@@ -133,7 +133,7 @@ describe.skipIf(!hasDb)("reviews", () => {
 
     it("omits unreviewed recipes from a batch rather than inventing a zero", async () => {
       const unreviewed = await addRecipe("Lentil Dahl", householdId, alice);
-      await saveReview(recipeId, householdId, alice, { stars: 4 });
+      await saveReview(recipeId, alice, { stars: 4 });
 
       const summaries = await getReviewSummaries([recipeId, unreviewed]);
       expect(summaries.has(unreviewed)).toBe(false);
@@ -146,19 +146,17 @@ describe.skipIf(!hasDb)("reviews", () => {
 
   describe("the scale", () => {
     it.each([0, 6, -1, 100])("refuses %i stars", async (stars) => {
-      await expect(
-        saveReview(recipeId, householdId, alice, { stars }),
-      ).rejects.toThrow();
+      await expect(saveReview(recipeId, alice, { stars })).rejects.toThrow();
     });
 
     it("refuses half stars", async () => {
       await expect(
-        saveReview(recipeId, householdId, alice, { stars: 3.5 }),
+        saveReview(recipeId, alice, { stars: 3.5 }),
       ).rejects.toThrow();
     });
 
     it.each([1, 2, 3, 4, 5])("accepts %i stars", async (stars) => {
-      await saveReview(recipeId, householdId, alice, { stars });
+      await saveReview(recipeId, alice, { stars });
       expect((await getMyReview(recipeId, alice))?.stars).toBe(stars);
     });
 
@@ -187,7 +185,7 @@ describe.skipIf(!hasDb)("reviews", () => {
 
   describe("stars and words travel together", () => {
     it("stores the words alongside the score", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 4,
         body: "Used thighs, needed ten more minutes.",
       });
@@ -198,20 +196,20 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("allows a score with nothing to add", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
+      await saveReview(recipeId, alice, { stars: 5 });
       expect((await listReviews(recipeId))[0].body).toBeNull();
     });
 
     it.each([undefined, null, "", "   ", "\n\t "])(
       "treats %j as having nothing to add rather than as empty words",
       async (body) => {
-        await saveReview(recipeId, householdId, alice, { stars: 5, body });
+        await saveReview(recipeId, alice, { stars: 5, body });
         expect((await listReviews(recipeId))[0].body).toBeNull();
       },
     );
 
     it("trims surrounding whitespace off the words", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 4,
         body: "  Used thighs.\n",
       });
@@ -219,7 +217,7 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("keeps line breaks inside the words", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 4,
         body: "Swaps:\n- thighs\n- less salt",
       });
@@ -230,7 +228,7 @@ describe.skipIf(!hasDb)("reviews", () => {
 
     it("refuses words longer than the limit", async () => {
       await expect(
-        saveReview(recipeId, householdId, alice, {
+        saveReview(recipeId, alice, {
           stars: 4,
           body: "x".repeat(MAX_BODY_LENGTH + 1),
         }),
@@ -238,7 +236,7 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("accepts words exactly at the limit", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 4,
         body: "x".repeat(MAX_BODY_LENGTH),
       });
@@ -248,8 +246,8 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("lets a revision add words to a score left bare", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 3 });
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, { stars: 3 });
+      await saveReview(recipeId, alice, {
         stars: 5,
         body: "Better second go.",
       });
@@ -263,26 +261,26 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("lets a revision take the words back off", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 3,
         body: "Too salty.",
       });
-      await saveReview(recipeId, householdId, alice, { stars: 3, body: "" });
+      await saveReview(recipeId, alice, { stars: 3, body: "" });
       expect((await listReviews(recipeId))[0].body).toBeNull();
     });
   });
 
   describe("the list", () => {
     it("puts the newest review first", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 5,
         body: "First.",
       });
-      await saveReview(recipeId, householdId, bob, {
+      await saveReview(recipeId, bob, {
         stars: 4,
         body: "Second.",
       });
-      await saveReview(recipeId, householdId, carol, {
+      await saveReview(recipeId, carol, {
         stars: 3,
         body: "Third.",
       });
@@ -295,7 +293,7 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("names the author", async () => {
-      await saveReview(recipeId, householdId, bob, {
+      await saveReview(recipeId, bob, {
         stars: 4,
         body: "Needed lemon.",
       });
@@ -307,11 +305,11 @@ describe.skipIf(!hasDb)("reviews", () => {
 
     it("keeps each recipe's reviews to itself", async () => {
       const other = await addRecipe("Lentil Dahl", householdId, alice);
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 5,
         body: "On the piccata.",
       });
-      await saveReview(other, householdId, alice, {
+      await saveReview(other, alice, {
         stars: 2,
         body: "On the dahl.",
       });
@@ -324,16 +322,16 @@ describe.skipIf(!hasDb)("reviews", () => {
 
   describe("your own review", () => {
     it("is null when you have not left one", async () => {
-      await saveReview(recipeId, householdId, bob, { stars: 5 });
+      await saveReview(recipeId, bob, { stars: 5 });
       expect(await getMyReview(recipeId, alice)).toBeNull();
     });
 
     it("is yours, not somebody else's", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 1,
         body: "Bland.",
       });
-      await saveReview(recipeId, householdId, bob, {
+      await saveReview(recipeId, bob, {
         stars: 5,
         body: "Superb.",
       });
@@ -347,14 +345,14 @@ describe.skipIf(!hasDb)("reviews", () => {
 
   describe("withdrawing", () => {
     it("removes your own", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
+      await saveReview(recipeId, alice, { stars: 5 });
       expect(await deleteReview(recipeId, alice)).toBe(true);
       expect(await listReviews(recipeId)).toEqual([]);
     });
 
     it("leaves everyone else's standing", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(recipeId, householdId, bob, {
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(recipeId, bob, {
         stars: 1,
         body: "Bland.",
       });
@@ -369,7 +367,7 @@ describe.skipIf(!hasDb)("reviews", () => {
     it("is not something the recipe's owner can do to a critic", async () => {
       // Alice uploaded the recipe. That does not make Bob's verdict on it hers
       // to remove.
-      await saveReview(recipeId, householdId, bob, {
+      await saveReview(recipeId, bob, {
         stars: 1,
         body: "Bland.",
       });
@@ -384,7 +382,7 @@ describe.skipIf(!hasDb)("reviews", () => {
 
   describe("cascades", () => {
     it("takes reviews with the recipe", async () => {
-      await saveReview(recipeId, householdId, alice, {
+      await saveReview(recipeId, alice, {
         stars: 5,
         body: "Good.",
       });
@@ -393,8 +391,8 @@ describe.skipIf(!hasDb)("reviews", () => {
     });
 
     it("takes a departing user's reviews with them", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
-      await saveReview(recipeId, householdId, bob, {
+      await saveReview(recipeId, alice, { stars: 5 });
+      await saveReview(recipeId, bob, {
         stars: 1,
         body: "Bland.",
       });
@@ -411,27 +409,25 @@ describe.skipIf(!hasDb)("reviews", () => {
 
   describe("what the pages load", () => {
     it("attaches the average to a recipe fetched by id", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 4 });
-      await saveReview(recipeId, householdId, bob, { stars: 2 });
+      await saveReview(recipeId, alice, { stars: 4 });
+      await saveReview(recipeId, bob, { stars: 2 });
 
-      expect((await getRecipe(recipeId, householdId))?.reviews).toEqual({
+      expect((await getRecipe(recipeId))?.reviews).toEqual({
         average: 3,
         count: 2,
       });
     });
 
     it("attaches a review count to a recipe fetched by id", async () => {
-      await saveReview(recipeId, householdId, alice, { stars: 4 });
-      expect((await getRecipe(recipeId, householdId))?._count.reviews).toBe(1);
+      await saveReview(recipeId, alice, { stars: 4 });
+      expect((await getRecipe(recipeId))?._count.reviews).toBe(1);
     });
 
     it("attaches the average to every search result", async () => {
       const other = await addRecipe("Lentil Dahl", householdId, alice);
-      await saveReview(recipeId, householdId, alice, { stars: 5 });
+      await saveReview(recipeId, alice, { stars: 5 });
 
-      const byId = new Map(
-        (await searchRecipes({ householdId })).map((r) => [r.id, r]),
-      );
+      const byId = new Map((await searchRecipes()).map((r) => [r.id, r]));
 
       expect(byId.get(recipeId)?.reviews).toEqual({ average: 5, count: 1 });
       // Unreviewed recipes still carry a summary, so no page has to guard

@@ -48,13 +48,13 @@ describe.skipIf(!hasDb)("ordering the library", () => {
   });
 
   const titles = async (options: Partial<RecipeSearchOptions> = {}) =>
-    (await searchRecipes({ householdId, ...options })).map((r) => r.title);
+    (await searchRecipes({ ...options })).map((r) => r.title);
 
   /** One review per star given, each from a different person. */
   async function rate(title: string, stars: number[]) {
     for (const [index, value] of stars.entries()) {
       const id = await reviewer(`${title}-${index}`);
-      await saveReview(ids[title], householdId, id, {
+      await saveReview(ids[title], id, {
         stars: value,
         body: null,
       });
@@ -176,11 +176,11 @@ describe.skipIf(!hasDb)("ordering the library", () => {
       // saveReview upserts, so cooking it again and thinking better of it
       // moves the average rather than adding a second vote.
       const cook = await reviewer("second-thoughts");
-      await saveReview(ids["Zabaglione"], householdId, cook, {
+      await saveReview(ids["Zabaglione"], cook, {
         stars: 1,
         body: null,
       });
-      await saveReview(ids["Zabaglione"], householdId, cook, {
+      await saveReview(ids["Zabaglione"], cook, {
         stars: 5,
         body: null,
       });

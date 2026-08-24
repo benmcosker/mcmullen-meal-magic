@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { prisma } from "./db";
-import { defaultHouseholdName } from "./household";
+import { defaultHouseholdName, MAX_HOUSEHOLD_NAME } from "./household";
 
 /** How long a freshly minted invite stays redeemable. */
 export const INVITE_TTL_DAYS = 14;
@@ -58,6 +58,12 @@ export function generateInviteCode(): string {
 export async function createInvite(params: {
   createdById: string;
   householdId: string | null;
+  /**
+   * What to call the household this code will create. Only read when
+   * `householdId` is null; ignored for a family invite, which joins a
+   * household that already has a name.
+   */
+  householdName?: string | null;
   email?: string | null;
 }): Promise<{ code: string; expiresAt: Date }> {
   const expiresAt = new Date(
@@ -71,6 +77,9 @@ export async function createInvite(params: {
       expiresAt,
       createdById: params.createdById,
       householdId: params.householdId,
+      householdName: params.householdId
+        ? null
+        : params.householdName?.trim().slice(0, MAX_HOUSEHOLD_NAME) || null,
     },
   });
 
@@ -138,20 +147,25 @@ export async function redeemInvite(
 
     const invite = await tx.invite.findUnique({
       where: { code: normalised },
-      select: { householdId: true },
+      select: { householdId: true, householdName: true },
     });
 
     let householdId = invite?.householdId ?? null;
 
     // No household on the invite means it was sent to someone outside the
     // family, so they start one of their own rather than joining the sender's.
+    // The sender may have named it when they sent the code - they usually know
+    // what the family calls itself better than the signup form does. Falling
+    // back to the redeemer's own name when they did not.
     if (!householdId) {
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { name: true },
       });
       const household = await tx.household.create({
-        data: { name: defaultHouseholdName(user?.name ?? "") },
+        data: {
+          name: invite?.householdName ?? defaultHouseholdName(user?.name ?? ""),
+        },
       });
       householdId = household.id;
     }

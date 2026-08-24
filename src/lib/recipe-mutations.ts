@@ -64,16 +64,18 @@ export async function createRecipe(
 }
 
 /**
- * Replace a recipe's contents. Returns false if it is not this household's.
+ * Replace a recipe's contents. Returns false if another household added it.
+ *
+ * Everyone can read the library; only the family who put a recipe in it can
+ * rewrite it. Without that, one household could quietly reword a card another
+ * household cooks from every week.
  *
  * Ingredients and tags are deleted and recreated rather than diffed: the lists
  * are short, ordering matters, and a diff would have to reconcile renames it
  * has no stable identity for. Wrapped in a transaction so a failure part-way
- * cannot leave a recipe with no ingredients.
- *
- * The ownership check runs inside that transaction rather than before it. A
- * check outside would be a window, however small, in which the recipe could
- * change hands between the answer and the write.
+ * cannot leave a recipe with no ingredients, and the ownership check runs
+ * inside it rather than before, leaving no window between the answer and the
+ * write.
  */
 export async function updateRecipe(
   id: string,
@@ -126,11 +128,14 @@ export async function updateRecipe(
 }
 
 /**
- * Remove a recipe, if it belongs to this household. Returns whether it did.
+ * Remove a recipe, if this household added it. Returns whether it did.
  *
- * `deleteMany` rather than `delete` so an id belonging to another family
- * matches nothing instead of erroring - the same answer as an id that was
- * already gone, and one that says nothing about what exists elsewhere.
+ * The library is shared, so a delete is not a private act: it takes the card
+ * away from everybody, including whoever planned it for Thursday. Only the
+ * family who added it may do that.
+ *
+ * `deleteMany` rather than `delete` so somebody else's id matches nothing
+ * instead of erroring, which is the same answer as an id already gone.
  */
 export async function deleteRecipe(
   id: string,
@@ -142,22 +147,12 @@ export async function deleteRecipe(
   return count > 0;
 }
 
-/**
- * Tags with a usage count, for the filter bar.
- *
- * Tag rows themselves stay a shared vocabulary - "Sheet Pan" means the same
- * thing in every kitchen, and a per-household copy of the word buys nothing.
- * The counts are what must be scoped: they are the only part that would
- * otherwise describe another family's library, and a tag used by nobody here
- * drops off the bar entirely.
- */
-export async function listTagsWithCounts(
-  householdId: string,
-): Promise<{ id: string; name: string; slug: string; count: number }[]> {
+/** Tags with a usage count, for the filter bar. */
+export async function listTagsWithCounts(): Promise<
+  { id: string; name: string; slug: string; count: number }[]
+> {
   const tags = await prisma.tag.findMany({
-    include: {
-      _count: { select: { recipes: { where: { recipe: { householdId } } } } },
-    },
+    include: { _count: { select: { recipes: true } } },
     orderBy: { name: "asc" },
   });
 

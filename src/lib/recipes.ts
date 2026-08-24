@@ -11,12 +11,6 @@ export type RecipeSearchHit = {
 };
 
 export type RecipeSearchOptions = {
-  /**
-   * Whose library to search. Required, and threaded into every branch below:
-   * this is the isolation mechanism, not a filter someone can forget and get
-   * away with.
-   */
-  householdId: string;
   /** Free-text query. Empty or whitespace-only returns the newest recipes. */
   query?: string;
   /** Tag slugs. A recipe must carry every slug listed to match. */
@@ -52,7 +46,7 @@ export type RecipeSearchOptions = {
  * a fully-hydrated Prisma object, so it re-fetches by ID and re-applies order.
  */
 export async function searchRecipeIds(
-  options: RecipeSearchOptions,
+  options: RecipeSearchOptions = {},
 ): Promise<RecipeSearchHit[]> {
   const query = options.query?.trim() ?? "";
   const sort = options.sort ?? DEFAULT_SORT;
@@ -109,7 +103,7 @@ export async function searchRecipeIds(
       SELECT r."id", 0::float8 AS rank
       FROM "recipe" r
       ${ratingJoin}
-      WHERE r."householdId" = ${options.householdId} ${tagFilter}
+      WHERE TRUE ${tagFilter}
       ORDER BY ${orderBy}
       LIMIT ${limit} OFFSET ${offset}
     `);
@@ -121,8 +115,7 @@ export async function searchRecipeIds(
       ts_rank(r."search_vector", websearch_to_tsquery('english', ${query}))::float8 AS rank
     FROM "recipe" r
     ${ratingJoin}
-    WHERE r."householdId" = ${options.householdId}
-    AND (
+    WHERE (
       r."search_vector" @@ websearch_to_tsquery('english', ${query})
       OR r."title" ILIKE ${like}
       OR r."description" ILIKE ${like}
@@ -181,7 +174,7 @@ async function withReviewSummaries<T extends { id: string }>(
 
 /** Search and hydrate in one call, preserving rank order. */
 export async function searchRecipes(
-  options: RecipeSearchOptions,
+  options: RecipeSearchOptions = {},
 ): Promise<RecipeWithRelations[]> {
   const hits = await searchRecipeIds(options);
   if (hits.length === 0) return [];
@@ -189,11 +182,7 @@ export async function searchRecipes(
   const ids = hits.map((h) => h.id);
   const recipes = await withReviewSummaries(
     await prisma.recipe.findMany({
-      // The household is already in the query above, so this is redundant -
-      // deliberately. It is the cheapest possible second barrier on the one
-      // query that decides what a family can see, and it costs nothing: the
-      // ids are indexed and already narrowed.
-      where: { id: { in: ids }, householdId: options.householdId },
+      where: { id: { in: ids } },
       include: recipeInclude,
     }),
   );
@@ -206,19 +195,13 @@ export async function searchRecipes(
 }
 
 /**
- * One recipe, if it belongs to the asking household.
- *
- * The id comes off a URL, so the household goes in the where clause rather
- * than being checked afterwards: another family's recipe is not found, which
- * is the same answer as a recipe that does not exist. Nothing about it leaks,
- * not even that it is there.
+ * One recipe. Readable by anyone signed in, whichever household added it.
  */
 export async function getRecipe(
   id: string,
-  householdId: string,
 ): Promise<RecipeWithRelations | null> {
-  const recipe = await prisma.recipe.findFirst({
-    where: { id, householdId },
+  const recipe = await prisma.recipe.findUnique({
+    where: { id },
     include: recipeInclude,
   });
   if (!recipe) return null;

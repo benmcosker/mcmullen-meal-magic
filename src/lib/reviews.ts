@@ -104,25 +104,22 @@ export async function getMyReview(
  * An upsert rather than a create: changing your mind about a dish you have now
  * cooked three times should move the average, not vote twice.
  *
- * Anyone in the household may review anything in it - the person who uploaded a
- * dish should not be the only one unable to hear what the others thought. The
- * household is checked all the same, because the recipe id arrives from a form
- * post and nothing else stops it naming another family's dish.
+ * Anyone signed in may review anything in the library, whichever household
+ * added it. That is the point of a shared library: an average over one family's
+ * three opinions says much less than one over everybody's.
  *
- * Throws if the recipe is not this household's, which is what the caller wants:
- * there is no sensible partial success, and no reason to distinguish it from a
- * recipe that does not exist.
+ * The recipe is still checked to exist, because the id arrives from a form post
+ * and a review attached to nothing is worse than an error.
  */
 export async function saveReview(
   recipeId: string,
-  householdId: string,
   userId: string,
   input: ReviewInput,
 ): Promise<string> {
   const { stars, body } = reviewInput.parse(input);
 
-  const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, householdId },
+  const recipe = await prisma.recipe.findUnique({
+    where: { id: recipeId },
     select: { id: true },
   });
   if (!recipe) throw new Error("No such recipe");

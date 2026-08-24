@@ -117,7 +117,7 @@ async function handleUpload(request: Request) {
   // difference between an instant answer and a slow, billable call whose
   // result gets thrown away.
   const pdfSha256 = hashBytes(bytes);
-  const alreadyHave = await findRecipeByPdfHash(pdfSha256, user.householdId);
+  const alreadyHave = await findRecipeByPdfHash(pdfSha256);
   if (alreadyHave) {
     return NextResponse.json(
       {
@@ -149,10 +149,7 @@ async function handleUpload(request: Request) {
   // A different PDF of a dish already in the library shares no bytes with it,
   // so only the title gives it away. Reported alongside the extraction as a
   // warning: the review screen can show it, and the person decides.
-  const similar = await findSimilarlyTitled(
-    extraction.recipe.title,
-    user.householdId,
-  );
+  const similar = await findSimilarlyTitled(extraction.recipe.title);
 
   return NextResponse.json({
     recipe: extraction.recipe,

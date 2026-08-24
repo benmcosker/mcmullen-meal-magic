@@ -40,8 +40,8 @@ export default async function RecipesPage({
   const sort = parseSort(params.sort);
 
   const [recipes, tags] = await Promise.all([
-    searchRecipes({ householdId, query, tagSlugs, sort }),
-    listTagsWithCounts(householdId),
+    searchRecipes({ query, tagSlugs, sort }),
+    listTagsWithCounts(),
   ]);
 
   return (
@@ -87,13 +87,17 @@ export default async function RecipesPage({
                  * a link, and a button inside an anchor is invalid markup
                  * whose clicks get taken by the navigation.
                  */}
-                <Box sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
-                  <DeleteRecipeButton
-                    id={recipe.id}
-                    title={recipe.title}
-                    compact
-                  />
-                </Box>
+                {recipe.householdId === householdId ? (
+                  <Box
+                    sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}
+                  >
+                    <DeleteRecipeButton
+                      id={recipe.id}
+                      title={recipe.title}
+                      compact
+                    />
+                  </Box>
+                ) : null}
                 {/*
                  * A row on a phone, a tile everywhere else.
                  *

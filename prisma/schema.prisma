@@ -146,6 +146,12 @@ model Invite {
   householdId String?
   household   Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
+  /// What to call the household this code will create, chosen by whoever sent
+  /// it. Only meaningful when `householdId` is null. Null falls back to a name
+  /// derived from the redeemer, which is the right answer when the sender did
+  /// not know what the family calls itself.
+  householdName String?
+
   createdById String
   createdBy   User   @relation("InviteSender", fields: [createdById], references: [id], onDelete: Cascade)
 
@@ -216,12 +222,19 @@ model Recipe {
   /// second upload. Unique, and null for recipes typed in by hand - Postgres
   /// treats NULLs as distinct, so any number of manual recipes coexist while
   /// one PDF can only ever produce one recipe.
-  /// Unique per household rather than globally: two families can each own a
-  /// copy of the same recipe card, and one household's upload must not make
-  /// the other's look like a duplicate.
-  pdfSha256   String?
+  /// Unique across the whole library, because the library is shared: if
+  /// somebody has already uploaded this exact card, the recipe is there for
+  /// everyone and a second copy is noise rather than a second dish.
+  pdfSha256   String? @unique
   imageUrl    String?
 
+  /// Which family added this, not who is allowed to read it.
+  ///
+  /// The library is shared: every signed-in household sees, searches, plans
+  /// and reviews every recipe, which is what makes the star averages worth
+  /// anything at this size. This column only decides who may change a recipe
+  /// or take it away again, so one family cannot delete another's cards out
+  /// of a library they both rely on.
   householdId String
   household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
@@ -241,8 +254,7 @@ model Recipe {
   /// Prisma Client cannot select Unsupported columns; search runs as raw SQL.
   searchVector Unsupported("tsvector")? @map("search_vector")
 
-  @@unique([householdId, pdfSha256])
-  @@index([householdId, createdAt])
+  @@index([householdId])
   @@index([createdById])
   @@index([createdAt])
   @@index([searchVector], type: Gin)

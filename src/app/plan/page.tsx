@@ -29,7 +29,6 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   const [meals, recipes, skips, pantry] = await Promise.all([
     getWeekPlan(weekStart, householdId),
     prisma.recipe.findMany({
-      where: { householdId },
       select: { id: true, title: true, servings: true, imageUrl: true },
       orderBy: { title: "asc" },
     }),
