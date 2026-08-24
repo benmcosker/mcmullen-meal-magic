@@ -66,18 +66,40 @@ export const auth = betterAuth({
       if (!userId) return;
 
       const code = readInviteCode(ctx.body);
-      const redeemed = code ? await redeemInvite(code, userId) : false;
 
-      if (!redeemed) {
-        await prisma.user.delete({ where: { id: userId } }).catch(() => {
-          // Already gone, or never committed. Either way the account is not
-          // usable and the error below is still the right answer.
-        });
+      // Redemption can fail two ways, and they need telling apart. Answering
+      // false means somebody else got there first. Throwing means the database
+      // refused - and the account still has to go, or the address it was
+      // created with is held hostage: the same person retrying with the same
+      // email is told it already exists, having never got an account at all.
+      let redeemed = false;
+      let failure: unknown = null;
+      try {
+        redeemed = code ? await redeemInvite(code, userId) : false;
+      } catch (error) {
+        failure = error;
+      }
 
-        throw new APIError("FORBIDDEN", {
-          message: "That invite has already been used.",
+      if (redeemed) return;
+
+      await prisma.user.delete({ where: { id: userId } }).catch(() => {
+        // Already gone, or never committed. Either way the account is not
+        // usable and the error below is still the right answer.
+      });
+
+      if (failure) {
+        // The only record of what actually happened: better-auth turns this
+        // into a status code, and the person signing up cannot be shown a
+        // database error.
+        console.error("[invite] redemption failed", failure);
+        throw new APIError("INTERNAL_SERVER_ERROR", {
+          message: "Something went wrong setting that account up. Try again.",
         });
       }
+
+      throw new APIError("FORBIDDEN", {
+        message: "That invite has already been used.",
+      });
     }),
   },
 });
