@@ -5,6 +5,7 @@ import { HouseholdManager } from "@/components/HouseholdManager";
 import { getHousehold, MAX_HOUSEHOLD_NAME } from "@/lib/household";
 import { INVITE_TTL_DAYS, listPendingInvites } from "@/lib/invites";
 import { requireHousehold } from "@/lib/session";
+import { smsAvailable } from "@/lib/sms";
 
 export default async function HouseholdPage() {
   const user = await requireHousehold();
@@ -30,6 +31,7 @@ export default async function HouseholdPage() {
             id: member.id,
             name: member.name,
             email: member.email,
+            phone: member.phone,
           })) ?? []
         }
         invites={invites.map((invite) => ({
@@ -41,6 +43,10 @@ export default async function HouseholdPage() {
         }))}
         inviteDays={INVITE_TTL_DAYS}
         maxNameLength={MAX_HOUSEHOLD_NAME}
+        myPhone={
+          household?.members.find((m) => m.id === user.id)?.phone ?? null
+        }
+        smsConfigured={smsAvailable()}
       />
     </AppShell>
   );

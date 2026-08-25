@@ -38,6 +38,13 @@ model User {
   email         String
   emailVerified Boolean   @default(false)
   image         String?
+  /// E.164, or null for somebody who has not given one.
+  ///
+  /// Optional because it only buys one thing - having the week's shopping
+  /// texted to you - and an account is perfectly usable without it. Not unique:
+  /// a household sharing one handset is odd but not wrong, and a unique index
+  /// would turn that into an error message nobody could act on.
+  phone         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]

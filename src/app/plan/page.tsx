@@ -16,6 +16,8 @@ import { NO_REVIEWS } from "@/lib/review-schema";
 import { getReviewSummaries } from "@/lib/reviews";
 import { listUsableProviders } from "@/lib/shopping";
 import { requireHousehold } from "@/lib/session";
+import { smsAvailable } from "@/lib/sms";
+import { shoppingListAudience } from "@/lib/sms/shopping-list";
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   const { householdId } = await requireHousehold();
@@ -35,6 +37,11 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     getWeeklySkips(weekStart, householdId),
     listPantryItems(householdId),
   ]);
+
+  // Who a text would actually reach. Fetched even when texting is switched off
+  // so the shape of the page does not depend on a code path, but only used
+  // when it is.
+  const audience = await shoppingListAudience(householdId);
 
   // Review scores on the picker tiles: choosing dinner is exactly when it helps
   // to see which of these the household actually liked.
@@ -66,6 +73,14 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         skips={skips}
         pantry={pantry}
         providers={listUsableProviders()}
+        smsAudience={
+          smsAvailable()
+            ? {
+                names: audience.recipients.map((r) => r.name),
+                withoutNumbers: audience.skipped,
+              }
+            : null
+        }
       />
     </AppShell>
   );

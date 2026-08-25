@@ -3,6 +3,8 @@
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import SmsIcon from "@mui/icons-material/Sms";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -20,6 +22,8 @@ import { useState, useTransition } from "react";
 import {
   sendWeekToProviderAction,
   setPlannedMealAction,
+  textShoppingListAction,
+  type TextListActionResult,
 } from "@/app/plan/actions";
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { groupBySection } from "@/lib/grocery-sections";
@@ -86,6 +90,7 @@ export function WeekPlanner({
   skips,
   pantry,
   providers,
+  smsAudience,
 }: {
   weekStartIso: string;
   prevWeekIso: string;
@@ -96,6 +101,8 @@ export function WeekPlanner({
   skips: WeeklySkipRecord[];
   pantry: PantryItemRecord[];
   providers: ProviderInfo[];
+  /** Null when texting is not configured on this deployment. */
+  smsAudience: { names: string[]; withoutNumbers: string[] } | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -104,6 +111,17 @@ export function WeekPlanner({
   );
   const [handoff, setHandoff] = useState<HandoffResult | null>(null);
   const [sendingTo, setSendingTo] = useState<ShoppingProvider | null>(null);
+  const [texting, setTexting] = useState(false);
+  const [textResult, setTextResult] = useState<TextListActionResult | null>(
+    null,
+  );
+
+  async function textList() {
+    setTexting(true);
+    setTextResult(null);
+    setTextResult(await textShoppingListAction(weekStartIso));
+    setTexting(false);
+  }
 
   const byKey = new Map(meals.map((m) => [`${m.date}|${m.slot}`, m]));
 
@@ -293,7 +311,47 @@ export function WeekPlanner({
                 {sendingTo === provider.id ? "Working\u2026" : provider.label}
               </Button>
             ))}
+
+            {smsAudience ? (
+              <Button
+                variant="outlined"
+                startIcon={<SmsIcon />}
+                disabled={
+                  texting ||
+                  groceries.length === 0 ||
+                  smsAudience.names.length === 0
+                }
+                onClick={textList}
+              >
+                {texting ? "Sending\u2026" : "Text the list"}
+              </Button>
+            ) : null}
           </Stack>
+
+          {smsAudience ? (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 1.5 }}
+            >
+              {smsAudience.names.length === 0
+                ? "Nobody has a phone number saved yet — add one on the household page."
+                : `Texts ${smsAudience.names.join(" and ")}.`}
+              {smsAudience.withoutNumbers.length > 0
+                ? ` ${smsAudience.withoutNumbers.join(" and ")} has no number saved.`
+                : ""}
+            </Typography>
+          ) : null}
+
+          {textResult ? (
+            <Alert
+              severity={textResult.ok ? "success" : "error"}
+              sx={{ mb: 2 }}
+              onClose={() => setTextResult(null)}
+            >
+              {textResult.ok ? textResult.message : textResult.error}
+            </Alert>
+          ) : null}
 
           {/*
            * Spelled out per provider, because the two kinds behave very

@@ -1,0 +1,232 @@
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const send = vi.hoisted(() => vi.fn());
+const available = vi.hoisted(() => vi.fn(() => true));
+
+vi.mock("@/lib/sms/index", () => ({
+  getSender: () => ({
+    info: () => ({ id: "test", label: "Test", available: available() }),
+    send,
+  }),
+  smsAvailable: () => available(),
+}));
+
+const { prisma } = await import("@/lib/db");
+const { createRecipe } = await import("@/lib/recipe-mutations");
+const { recipeInput } = await import("@/lib/recipe-schema");
+const { addPantryItem } = await import("@/lib/pantry");
+const { weekStartOf } = await import("@/lib/grocery");
+const { shoppingListAudience, textShoppingList } =
+  await import("@/lib/sms/shopping-list");
+const { makeHousehold, makeUser, resetDatabase } = await import("./support/db");
+
+const hasDb = Boolean(process.env.DATABASE_URL);
+const monday = weekStartOf(new Date("2026-03-04T12:00:00.000Z"));
+
+describe.skipIf(!hasDb)("texting the shopping list", () => {
+  let householdId: string;
+  let userId: string;
+
+  beforeEach(async () => {
+    await resetDatabase();
+    send.mockReset();
+    send.mockResolvedValue({ ok: true });
+    available.mockReturnValue(true);
+    ({ householdId, userId } = await makeHousehold("Ours"));
+  });
+
+  afterAll(async () => {
+    await resetDatabase();
+    await prisma.$disconnect();
+  });
+
+  async function planADinner(ingredients: string[]) {
+    const recipeId = await createRecipe(
+      recipeInput.parse({
+        title: "Chicken Piccata",
+        instructions: ["Cook"],
+        ingredients: ingredients.map((name) => ({
+          name,
+          quantity: 1,
+          unit: null,
+        })),
+        tags: [],
+      }),
+      householdId,
+      userId,
+    );
+    await prisma.plannedMeal.create({
+      data: {
+        householdId,
+        date: monday,
+        slot: "DINNER",
+        recipeId,
+        servings: 4,
+      },
+    });
+  }
+
+  const setPhone = (id: string, phone: string | null) =>
+    prisma.user.update({ where: { id }, data: { phone } });
+
+  const run = () =>
+    textShoppingList({
+      householdId,
+      weekStart: monday,
+      weekLabel: "this week",
+    });
+
+  describe("who it reaches", () => {
+    it("texts everybody in the household who has a number", async () => {
+      // Not just whoever pressed the button: the person who plans the week is
+      // routinely not the person who walks round the shop.
+      const partner = await makeUser(householdId);
+      await setPhone(userId, "+15551110000");
+      await setPhone(partner, "+15552220000");
+      await planADinner(["chicken breast"]);
+
+      const result = await run();
+      expect(result.ok).toBe(true);
+      expect(send.mock.calls.map((c) => c[0]).sort()).toEqual([
+        "+15551110000",
+        "+15552220000",
+      ]);
+    });
+
+    it("names who has no number rather than silently leaving them out", async () => {
+      const partner = await makeUser(householdId);
+      await setPhone(userId, "+15551110000");
+      await prisma.user.update({
+        where: { id: partner },
+        data: { name: "Silent Sam" },
+      });
+      await planADinner(["chicken breast"]);
+
+      const result = await run();
+      expect(result.ok && result.skipped).toEqual(["Silent Sam"]);
+    });
+
+    it("never texts another household's members", async () => {
+      const other = await makeHousehold("Theirs");
+      await setPhone(other.userId, "+15559990000");
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+
+      await run();
+      expect(send.mock.calls.map((c) => c[0])).toEqual(["+15551110000"]);
+    });
+
+    it("refuses when nobody has a number, rather than reporting success", async () => {
+      await planADinner(["chicken breast"]);
+      const result = await run();
+      expect(result).toEqual({
+        ok: false,
+        error: "Nobody in the household has a phone number yet.",
+      });
+      expect(send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("what it sends", () => {
+    it("refuses an empty week rather than texting a heading", async () => {
+      await setPhone(userId, "+15551110000");
+      const result = await run();
+      expect(result.ok).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("leaves pantry staples out, as the on-screen list does", async () => {
+      // The text and the page have to agree, or the list in your hand and the
+      // list on the fridge disagree about olive oil.
+      await setPhone(userId, "+15551110000");
+      await addPantryItem("Olive oil", householdId, userId);
+      await planADinner(["chicken breast", "olive oil"]);
+
+      await run();
+      const body = send.mock.calls[0][1] as string;
+      expect(body).toContain("chicken breast");
+      expect(body.toLowerCase()).not.toContain("olive oil");
+    });
+
+    it("says which week it is for", async () => {
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+
+      await run();
+      expect(send.mock.calls[0][1]).toContain("this week");
+    });
+  });
+
+  describe("when sending goes wrong", () => {
+    it("reports a partial failure as a success, naming who missed out", async () => {
+      // Telling somebody the send failed when the list is already on their
+      // partner's phone sends them to do the whole thing again.
+      const partner = await makeUser(householdId);
+      await prisma.user.update({
+        where: { id: partner },
+        data: { name: "Pat", phone: "+15552220000" },
+      });
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+
+      send.mockImplementation(async (to: string) =>
+        to === "+15552220000"
+          ? { ok: false, error: "unverified number" }
+          : { ok: true },
+      );
+
+      const result = await run();
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.failed).toEqual([
+        { name: "Pat", error: "unverified number" },
+      ]);
+    });
+
+    it("reports a failure when nobody got it", async () => {
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue({ ok: false, error: "carrier rejected" });
+
+      expect(await run()).toEqual({ ok: false, error: "carrier rejected" });
+    });
+
+    it("stops sending parts to somebody once one fails", async () => {
+      // The rest would arrive as a numbered list with a hole in it.
+      await setPhone(userId, "+15551110000");
+      // Enough to split the list across several messages, and within the 200
+      // the recipe schema allows.
+      await planADinner(
+        Array.from({ length: 150 }, (_, i) => `long ingredient name ${i}`),
+      );
+      send.mockResolvedValue({ ok: false, error: "carrier rejected" });
+
+      await run();
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing at all when texting is not configured", async () => {
+      available.mockReturnValue(false);
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+
+      const result = await run();
+      expect(result.ok).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("shoppingListAudience", () => {
+    it("separates who can be reached from who cannot", async () => {
+      const partner = await makeUser(householdId);
+      await prisma.user.update({
+        where: { id: partner },
+        data: { name: "Pat" },
+      });
+      await setPhone(userId, "+15551110000");
+
+      const { recipients, skipped } = await shoppingListAudience(householdId);
+      expect(recipients.map((r) => r.phone)).toEqual(["+15551110000"]);
+      expect(skipped).toEqual(["Pat"]);
+    });
+  });
+});

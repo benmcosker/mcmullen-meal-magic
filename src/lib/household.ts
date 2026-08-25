@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { parsePhone } from "./phone";
 
 /**
  * A household's name when nobody has chosen one.
@@ -21,6 +22,8 @@ export type HouseholdMember = {
   id: string;
   name: string;
   email: string;
+  /** E.164, or null. Whether the week's shopping can reach them. */
+  phone: string | null;
   joinedAt: Date;
 };
 
@@ -37,7 +40,13 @@ export async function getHousehold(
     where: { id: householdId },
     include: {
       members: {
-        select: { id: true, name: true, email: true, createdAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -51,6 +60,7 @@ export async function getHousehold(
       id: member.id,
       name: member.name,
       email: member.email,
+      phone: member.phone,
       joinedAt: member.createdAt,
     })),
   };
@@ -71,4 +81,34 @@ export async function renameHousehold(
     data: { name: trimmed },
   });
   return trimmed;
+}
+
+export type SavePhoneResult =
+  { ok: true; phone: string | null } | { ok: false; error: string };
+
+/**
+ * Set or clear your own number.
+ *
+ * Only ever your own: a phone number is the one thing here that reaches a
+ * person outside the app, and somebody else in the household typing it wrongly
+ * sends the week's shopping to a stranger. Blank clears it, which is how
+ * somebody stops receiving the texts without leaving the household.
+ */
+export async function saveOwnPhone(
+  userId: string,
+  input: string,
+): Promise<SavePhoneResult> {
+  if (!input.trim()) {
+    await prisma.user.update({ where: { id: userId }, data: { phone: null } });
+    return { ok: true, phone: null };
+  }
+
+  const parsed = parsePhone(input);
+  if (!parsed.ok) return { ok: false, error: parsed.reason };
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { phone: parsed.e164 },
+  });
+  return { ok: true, phone: parsed.e164 };
 }

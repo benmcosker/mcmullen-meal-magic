@@ -123,12 +123,13 @@ It runs a real query rather than returning a bare 200, because the failures
 worth catching all look like a healthy app until something touches the
 database. The three states it distinguishes:
 
-| Response                           | Meaning                             | Fix                                                                                                                                                            |
-| ---------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reachable: false`                 | Wrong or unreachable `DATABASE_URL` | Check the pooled string and Neon's IP rules                                                                                                                    |
-| `reachable: true, migrated: false` | Connected, schema never created     | The `vercel-build` script did not run — check the build log                                                                                                    |
-| `status: "read-only"`              | Reads work, every write is refused  | `reason` says which: a read replica means `DATABASE_URL` points at the wrong endpoint; read-only mode is usually the provider, over a limit or mid-maintenance |
-| `status: ok`                       | Working                             | —                                                                                                                                                              |
+| Response                                                | Meaning                             | Fix                                                                                                                                                                           |
+| ------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reachable: false`                                      | Wrong or unreachable `DATABASE_URL` | Check the pooled string and Neon's IP rules                                                                                                                                   |
+| `reachable: true, migrated: false`                      | Connected, schema never created     | The `vercel-build` script did not run — check the build log                                                                                                                   |
+| `disabledFeatures` contains `Texting the shopping list` | No SMS provider configured          | Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER`. US numbers also need A2P 10DLC registration, or carriers drop the messages without reporting anything |
+| `status: "read-only"`                                   | Reads work, every write is refused  | `reason` says which: a read replica means `DATABASE_URL` points at the wrong endpoint; read-only mode is usually the provider, over a limit or mid-maintenance                |
+| `status: ok`                                            | Working                             | —                                                                                                                                                                             |
 
 `disabledFeatures` lists any optional integration that is off, so you can tell
 a deliberate omission from a typo in a key name.
