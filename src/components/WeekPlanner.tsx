@@ -2,6 +2,7 @@
 
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import SmsIcon from "@mui/icons-material/Sms";
 import Alert from "@mui/material/Alert";
@@ -210,29 +211,81 @@ export function WeekPlanner({
                       minHeight: 28,
                     }}
                   >
-                    <Typography variant="subtitle2">{day}</Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    {/*
+                     * "Wed" on a phone, "Wednesday" from a tablet up. A
+                     * half-width tile carrying a date and two icon buttons
+                     * leaves the day name about seventy pixels, which turns
+                     * "Wednesday" into "Wed…" - the same three letters, plus
+                     * an ellipsis implying something was lost. Rendered as two
+                     * spans rather than a media-query hook because this is a
+                     * server-rendered page and useMediaQuery guesses wrong on
+                     * the first paint.
+                     */}
+                    <Typography variant="subtitle2" noWrap>
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "none", sm: "inline" } }}
+                      >
+                        {day}
+                      </Box>
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "inline", sm: "none" } }}
+                      >
+                        {day.slice(0, 3)}
+                      </Box>
+                    </Typography>
+                    {/*
+                     * Both refuse to wrap: two icon buttons in the header of a
+                     * half-width tile leave the date about forty pixels, and a
+                     * date broken across two lines ("08-" above "24") makes the
+                     * tile taller than its neighbour for no reason. The day
+                     * name is the one that gives, since it is the part still
+                     * readable when clipped.
+                     */}
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
                       {date.slice(5)}
                     </Typography>
                     {/*
-                     * Clearing a day is also offered inside the picker, but
-                     * getting there means opening a dialog to undo something
-                     * you can see. Sits in the header rather than over the
-                     * tile: the tile is a CardActionArea, and a button nested
-                     * inside a button is invalid markup that swallows clicks.
+                     * Opening the recipe and clearing the day both live in the
+                     * header rather than on the tile. The tile is a
+                     * CardActionArea that opens the picker, and an anchor or a
+                     * button nested inside a button is invalid markup that
+                     * swallows the click - which is also why the recipe title
+                     * itself cannot be the link, tempting as that is.
                      */}
                     {planned ? (
-                      <Tooltip title={`Remove ${planned.title}`}>
-                        <IconButton
-                          size="small"
-                          aria-label={`Remove ${planned.title} from ${day}`}
-                          disabled={pending}
-                          onClick={() => assign(date, null)}
-                          sx={{ ml: "auto", alignSelf: "center" }}
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <Stack
+                        direction="row"
+                        sx={{ ml: "auto", alignSelf: "center" }}
+                      >
+                        <Tooltip title={`Open ${planned.title}`}>
+                          <IconButton
+                            size="small"
+                            component={Link}
+                            href={`/recipes/${planned.id}`}
+                            aria-label={`Open the recipe for ${planned.title}`}
+                            sx={{ p: 0.5 }}
+                          >
+                            <MenuBookIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={`Remove ${planned.title}`}>
+                          <IconButton
+                            size="small"
+                            aria-label={`Remove ${planned.title} from ${day}`}
+                            disabled={pending}
+                            onClick={() => assign(date, null)}
+                            sx={{ p: 0.5 }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                     ) : null}
                   </Stack>
 
