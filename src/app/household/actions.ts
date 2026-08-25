@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createInvite, revokeInvite } from "@/lib/invites";
-import { renameHousehold } from "@/lib/household";
+import { renameHousehold, saveOwnPhone } from "@/lib/household";
 import { requireHousehold } from "@/lib/session";
 
 export type InviteKind = "family" | "outside";
@@ -124,4 +124,22 @@ export async function revokeInviteAction(id: string): Promise<void> {
     console.error("[invite] could not revoke", error);
   }
   revalidatePath("/household");
+}
+
+export type PhoneResult =
+  { ok: true; phone: string | null } | { ok: false; error: string };
+
+/** Set or clear your own number. Never anybody else's - see saveOwnPhone. */
+export async function saveMyPhoneAction(phone: string): Promise<PhoneResult> {
+  const user = await requireHousehold();
+
+  try {
+    const result = await saveOwnPhone(user.id, phone);
+    revalidatePath("/household");
+    revalidatePath("/plan");
+    return result;
+  } catch (error) {
+    console.error("[household] could not save phone", error);
+    return { ok: false, error: "That number could not be saved. Try again." };
+  }
 }

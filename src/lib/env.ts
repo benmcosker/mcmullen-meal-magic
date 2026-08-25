@@ -33,6 +33,14 @@ const OPTIONAL = [
     consequence: "Uploads return a clear error; recipes can still be typed in.",
   },
   {
+    feature: "Texting the shopping list",
+    missing: "TWILIO_ACCOUNT_SID",
+    consequence:
+      "The button is hidden; the list can still be copied as text. Needs " +
+      "TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER alongside it, and US numbers " +
+      "need A2P 10DLC registration or carriers filter the messages silently.",
+  },
+  {
     feature: "Cloud file storage",
     missing: "BLOB_READ_WRITE_TOKEN",
     consequence:

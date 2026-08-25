@@ -18,11 +18,18 @@ import {
   createInviteAction,
   renameHouseholdAction,
   revokeInviteAction,
+  saveMyPhoneAction,
   type CreatedInvite,
   type InviteKind,
 } from "@/app/household/actions";
+import { formatPhone } from "@/lib/phone";
 
-export type MemberView = { id: string; name: string; email: string };
+export type MemberView = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+};
 export type InviteView = {
   id: string;
   code: string;
@@ -59,16 +66,21 @@ export function HouseholdManager({
   invites,
   inviteDays,
   maxNameLength,
+  myPhone,
+  smsConfigured,
 }: {
   householdName: string;
   members: MemberView[];
   invites: InviteView[];
   inviteDays: number;
   maxNameLength: number;
+  myPhone: string | null;
+  smsConfigured: boolean;
 }) {
   return (
     <Stack spacing={3}>
       <HouseholdName current={householdName} maxLength={maxNameLength} />
+      <MyPhone current={myPhone} smsConfigured={smsConfigured} />
       <Members members={members} householdName={householdName} />
       <InviteForm inviteDays={inviteDays} maxNameLength={maxNameLength} />
       {invites.length > 0 ? <PendingInvites invites={invites} /> : null}
@@ -117,6 +129,7 @@ function HouseholdName({
             type="submit"
             variant="outlined"
             disabled={!changed || pending}
+            sx={{ flexShrink: 0 }}
           >
             Save
           </Button>
@@ -124,6 +137,84 @@ function HouseholdName({
         {error ? (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
+          </Alert>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Your own number, and only ever your own.
+ *
+ * A phone number is the one field here that reaches somebody outside the app,
+ * so nobody gets to type it on another person's behalf: a digit wrong sends
+ * the week's shopping to a stranger who never asked for it.
+ */
+function MyPhone({
+  current,
+  smsConfigured,
+}: {
+  current: string | null;
+  smsConfigured: boolean;
+}) {
+  const [draft, setDraft] = useState(current ? formatPhone(current) : "");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function save(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSaved(null);
+
+    startTransition(async () => {
+      const result = await saveMyPhoneAction(draft);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setDraft(result.phone ? formatPhone(result.phone) : "");
+      setSaved(result.phone ? "Saved." : "Removed.");
+    });
+  }
+
+  return (
+    <Card>
+      <CardContent component="form" onSubmit={save}>
+        <Typography variant="h2" sx={{ mb: 0.5 }}>
+          Your phone
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          {smsConfigured
+            ? "Used to text you the week's shopping list. Clear it to stop."
+            : "Texting is not set up on this deployment yet, so a number here does nothing for now."}
+        </Typography>
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <TextField
+            label="Phone"
+            type="tel"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="(555) 123-4567"
+            autoComplete="tel"
+            fullWidth
+            size="small"
+          />
+          <Button type="submit" variant="outlined" disabled={pending}>
+            Save
+          </Button>
+        </Stack>
+
+        {error ? (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        ) : null}
+        {saved ? (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {saved}
           </Alert>
         ) : null}
       </CardContent>
@@ -156,6 +247,11 @@ function Members({
               <Typography>{member.name}</Typography>
               <Typography variant="body2" color="text.secondary">
                 {member.email}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {member.phone
+                  ? formatPhone(member.phone)
+                  : "No number — will not get the shopping text"}
               </Typography>
             </Box>
           ))}
@@ -245,7 +341,19 @@ function InviteForm({
               fullWidth
               size="small"
             />
-            <Button type="submit" variant="contained" disabled={pending} sx={{lineHeight: "1rem"}}>
+            {/*
+             * A button beside a fullWidth TextField gets squeezed below its
+             * own text and wraps - which is what made this one two lines tall.
+             * Refusing to shrink fixes the cause; shrinking the line height
+             * instead left it two lines on a desktop and a 28px tap target on
+             * a phone, where it did not wrap at all.
+             */}
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={pending}
+              sx={{ flexShrink: 0 }}
+            >
               Create code
             </Button>
           </Stack>

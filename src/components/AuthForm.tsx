@@ -34,6 +34,7 @@ export function AuthForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState(initialInviteCode);
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,16 +45,18 @@ export function AuthForm({
 
     // better-auth's sign-up body schema accepts arbitrary extra fields at
     // runtime, but the generated client type lists only the built-in ones.
-    // The invite code is read by the before-hook in src/lib/auth.ts.
-    const signUpWithInvite = signUp.email as (input: {
+    // The invite code is read by the before-hook in src/lib/auth.ts, and the
+    // phone number by the after-hook once the account exists.
+    const signUpWithExtras = signUp.email as (input: {
       name: string;
       email: string;
       password: string;
       inviteCode: string;
+      phone: string;
     }) => ReturnType<typeof signUp.email>;
 
     const result = isSignUp
-      ? await signUpWithInvite({ name, email, password, inviteCode })
+      ? await signUpWithExtras({ name, email, password, inviteCode, phone })
       : await signIn.email({ email, password });
 
     if (result.error) {
@@ -105,6 +108,14 @@ export function AuthForm({
                   onChange={(e) => setName(e.target.value)}
                   required
                   autoComplete="name"
+                />
+                <TextField
+                  label="Phone (optional)"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
+                  helperText="Only used to text you the week's shopping list. You can add it later."
                 />
               </>
             ) : null}

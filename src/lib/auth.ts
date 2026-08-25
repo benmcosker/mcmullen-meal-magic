@@ -4,6 +4,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 
 import { prisma } from "./db";
 import { checkInvite, inviteRejectionMessage, redeemInvite } from "./invites";
+import { parsePhone } from "./phone";
 
 const SIGN_UP_PATH = "/sign-up/email";
 
@@ -11,6 +12,12 @@ function readInviteCode(body: unknown): string {
   if (typeof body !== "object" || body === null) return "";
   const code = (body as { inviteCode?: unknown }).inviteCode;
   return typeof code === "string" ? code.trim() : "";
+}
+
+function readPhone(body: unknown): string {
+  if (typeof body !== "object" || body === null) return "";
+  const phone = (body as { phone?: unknown }).phone;
+  return typeof phone === "string" ? phone.trim() : "";
 }
 
 function readEmail(body: unknown): string {
@@ -80,7 +87,22 @@ export const auth = betterAuth({
         failure = error;
       }
 
-      if (redeemed) return;
+      if (redeemed) {
+        // Optional, and stored after the account is safely its own. A number
+        // that will not parse is dropped rather than refused: it buys one
+        // convenience, and losing a whole signup over a typo in a field nobody
+        // had to fill in would be a poor trade. It can be set on the household
+        // page afterwards, where a mistake can actually be seen and corrected.
+        const phone = parsePhone(readPhone(ctx.body));
+        if (phone.ok) {
+          await prisma.user
+            .update({ where: { id: userId }, data: { phone: phone.e164 } })
+            .catch((error) => {
+              console.error("[signup] could not store phone", error);
+            });
+        }
+        return;
+      }
 
       await prisma.user.delete({ where: { id: userId } }).catch(() => {
         // Already gone, or never committed. Either way the account is not

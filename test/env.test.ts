@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { checkEnv, formatMissingRequired } from "@/lib/env";
 
@@ -6,6 +6,7 @@ const full = {
   DATABASE_URL: "postgresql://localhost/db",
   BETTER_AUTH_SECRET: "secret",
   ANTHROPIC_API_KEY: "k",
+  TWILIO_ACCOUNT_SID: "k",
   BLOB_READ_WRITE_TOKEN: "k",
 };
 
@@ -39,6 +40,7 @@ describe("checkEnv", () => {
     expect(report.missingRequired).toEqual([]);
     expect(report.disabledFeatures.map((f) => f.missing)).toEqual([
       "ANTHROPIC_API_KEY",
+      "TWILIO_ACCOUNT_SID",
       "BLOB_READ_WRITE_TOKEN",
     ]);
   });
@@ -62,10 +64,21 @@ describe("checkEnv", () => {
   });
 
   it("says what each missing optional key actually costs", () => {
-    const blob = checkEnv({ ...full, BLOB_READ_WRITE_TOKEN: "" })
-      .disabledFeatures[0];
+    const [blob] = checkEnv({
+      ...full,
+      BLOB_READ_WRITE_TOKEN: "",
+    }).disabledFeatures;
     expect(blob.feature).toBe("Cloud file storage");
     expect(blob.consequence).toMatch(/vanish between deploys/);
+
+    const [sms] = checkEnv({
+      ...full,
+      TWILIO_ACCOUNT_SID: "",
+    }).disabledFeatures;
+    expect(sms.feature).toBe("Texting the shopping list");
+    // The part nobody discovers on their own: unregistered US traffic is not
+    // rejected, it is silently filtered, so the app looks like it worked.
+    expect(sms.consequence).toMatch(/A2P 10DLC/);
   });
 });
 
@@ -85,5 +98,41 @@ describe("formatMissingRequired", () => {
     expect(formatMissingRequired(["DATABASE_URL"])).toContain(
       "1 required environment variable missing",
     );
+  });
+});
+
+describe("the log-only SMS override", () => {
+  it("is refused in production, whatever the variable says", async () => {
+    // The failure this guards: somebody believing the week's shopping went out
+    // when it only reached a log file.
+    vi.stubEnv("SMS_LOG_ONLY", "true");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TWILIO_ACCOUNT_SID", "");
+    vi.stubEnv("TWILIO_AUTH_TOKEN", "");
+    vi.stubEnv("TWILIO_FROM_NUMBER", "");
+
+    const { smsAvailable } = await import("@/lib/sms");
+    expect(smsAvailable()).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it("makes the feature reachable in development, so it can be tried", async () => {
+    vi.stubEnv("SMS_LOG_ONLY", "true");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("TWILIO_ACCOUNT_SID", "");
+
+    const { smsAvailable } = await import("@/lib/sms");
+    expect(smsAvailable()).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it("stays off when nothing is configured at all", async () => {
+    vi.stubEnv("SMS_LOG_ONLY", "");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("TWILIO_ACCOUNT_SID", "");
+
+    const { smsAvailable } = await import("@/lib/sms");
+    expect(smsAvailable()).toBe(false);
+    vi.unstubAllEnvs();
   });
 });

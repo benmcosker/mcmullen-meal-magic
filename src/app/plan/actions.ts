@@ -6,6 +6,7 @@ import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { aggregateIngredients, getWeekPlan, weekStartOf } from "@/lib/grocery";
 import { getProvider, type HandoffResult } from "@/lib/shopping";
+import { textShoppingList } from "@/lib/sms/shopping-list";
 import { requireHousehold } from "@/lib/session";
 
 export async function setPlannedMealAction(input: {
@@ -95,4 +96,52 @@ export async function sendWeekToProviderAction(
 
   revalidatePath("/plan");
   return result;
+}
+
+export type TextListActionResult =
+  { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Text this week's shopping to everyone in the household who has a number.
+ *
+ * The week is taken from the client, the list is not: what gets sent is what
+ * the plan says now, rather than what a page rendered some minutes ago and may
+ * have been left open through.
+ */
+export async function textShoppingListAction(
+  weekStartIso: string,
+): Promise<TextListActionResult> {
+  const { householdId } = await requireHousehold();
+  const weekStart = weekStartOf(new Date(weekStartIso));
+
+  let result;
+  try {
+    result = await textShoppingList({
+      householdId,
+      weekStart,
+      weekLabel: `week of ${weekStart.toISOString().slice(0, 10)}`,
+    });
+  } catch (error) {
+    console.error("[sms] could not text the shopping list", error);
+    return { ok: false, error: "The message could not be sent. Try again." };
+  }
+
+  if (!result.ok) return result;
+
+  const parts = result.parts === 1 ? "" : ` in ${result.parts} messages`;
+  const sent = `Sent to ${formatNames(result.delivered)}${parts}.`;
+  const failed = result.failed.length
+    ? ` Could not reach ${formatNames(result.failed.map((f) => f.name))}: ${result.failed[0].error}`
+    : "";
+  const skipped = result.skipped.length
+    ? ` ${formatNames(result.skipped)} ${result.skipped.length === 1 ? "has" : "have"} no number saved.`
+    : "";
+
+  return { ok: true, message: `${sent}${failed}${skipped}` };
+}
+
+/** "Ben", "Ben and Laura", "Ben, Laura and Pat". */
+function formatNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "nobody";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
