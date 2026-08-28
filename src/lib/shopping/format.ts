@@ -1,10 +1,14 @@
 import { groupBySection } from "../grocery-sections";
+import { formatQuantity } from "../quantity";
 import type { GroceryLine } from "../grocery";
 
 /** "2 tbsp", "400 g", "3", or "" when there is no amount. */
 export function formatAmount(line: GroceryLine): string {
   if (line.quantity == null) return "";
-  const amount = String(line.quantity);
+  // Fractions read as fractions on a shopping list too - "1/2 lb" rather than
+  // "0.5 lb" - including in the text message, which is the version somebody
+  // reads one-handed in a shop.
+  const amount = formatQuantity(line.quantity);
   return line.unit ? `${amount} ${line.unit}` : amount;
 }
 

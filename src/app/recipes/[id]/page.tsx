@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/AppShell";
+import { formatQuantity } from "@/lib/quantity";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { IconChip } from "@/components/IconChip";
 import { LinkButton } from "@/components/LinkButton";
@@ -23,10 +24,13 @@ import { formatMinutes, formatOvenTemp } from "@/lib/temperature";
 import { getRecipe } from "@/lib/recipes";
 import { requireHousehold } from "@/lib/session";
 
-function formatQuantity(quantity: number | null, unit: string | null): string {
+function formatAmount(quantity: number | null, unit: string | null): string {
   // No rounding: String already gives "2" for 2.0 and keeps 0.25 intact.
   if (quantity == null) return unit ?? "";
-  return unit ? `${quantity} ${unit}` : String(quantity);
+  // Shown as it was typed: a half stays "1/2" rather than becoming "0.5",
+  // which is the same number and not how a recipe reads.
+  const amount = formatQuantity(quantity);
+  return unit ? `${amount} ${unit}` : amount;
 }
 
 export default async function RecipePage({
@@ -194,7 +198,7 @@ export default async function RecipePage({
                   <Box key={ingredient.id}>
                     <Typography variant="body2">
                       <Box component="span" sx={{ fontWeight: 600 }}>
-                        {formatQuantity(ingredient.quantity, ingredient.unit)}
+                        {formatAmount(ingredient.quantity, ingredient.unit)}
                       </Box>{" "}
                       {ingredient.name}
                     </Typography>

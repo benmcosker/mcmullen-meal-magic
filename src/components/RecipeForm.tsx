@@ -16,6 +16,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState, type FormEvent } from "react";
 
+import { formatQuantity, parseQuantity } from "@/lib/quantity";
 import { TEMPERATURE_UNITS, type RecipeInput } from "@/lib/recipe-schema";
 
 export type RecipeFormValues = RecipeInput;
@@ -27,7 +28,7 @@ function toRows(ingredients: RecipeInput["ingredients"]): Row[] {
     return [{ name: "", quantity: "", unit: "", note: "" }];
   return ingredients.map((i) => ({
     name: i.name,
-    quantity: i.quantity == null ? "" : String(i.quantity),
+    quantity: formatQuantity(i.quantity ?? null),
     unit: i.unit ?? "",
     note: i.note ?? "",
   }));
@@ -75,6 +76,9 @@ export function RecipeForm({
   const [tags, setTags] = useState<string[]>(initial.tags);
   const [tagDraft, setTagDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [quantityIssues, setQuantityIssues] = useState<Map<number, string>>(
+    new Map(),
+  );
   const [busy, setBusy] = useState(false);
 
   function addEquipment() {
@@ -95,10 +99,42 @@ export function RecipeForm({
     setTagDraft("");
   }
 
+  /**
+   * Which rows have an unreadable quantity, by index.
+   *
+   * Checked here rather than left to the schema: a NaN reaching Zod is
+   * reported as a type error on the whole form, which is true and useless -
+   * it does not say which of eleven ingredients it means.
+   */
+  function quantityErrors(current: Row[]): Map<number, string> {
+    const errors = new Map<number, string>();
+    current.forEach((row, index) => {
+      if (!row.name.trim()) return;
+      const parsed = parseQuantity(row.quantity);
+      if (!parsed.ok) errors.set(index, parsed.reason);
+    });
+    return errors;
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
     setError(null);
+
+    const named = rows.filter((r) => r.name.trim());
+    const badQuantities = quantityErrors(rows);
+    if (badQuantities.size > 0) {
+      // Marked on the fields themselves; the banner only says how many, since
+      // the reason is already sitting under each one.
+      setQuantityIssues(badQuantities);
+      setError(
+        badQuantities.size === 1
+          ? "One ingredient has a quantity that cannot be read."
+          : `${badQuantities.size} ingredients have quantities that cannot be read.`,
+      );
+      return;
+    }
+    setQuantityIssues(new Map());
+    setBusy(true);
 
     const values: RecipeFormValues = {
       title,
@@ -117,14 +153,13 @@ export function RecipeForm({
       sourceName: sourceName || null,
       notes: notes || null,
       instructions: steps.map((s) => s.trim()).filter(Boolean),
-      ingredients: rows
-        .filter((r) => r.name.trim())
-        .map((r) => ({
-          name: r.name.trim(),
-          quantity: r.quantity === "" ? null : Number(r.quantity),
-          unit: r.unit || null,
-          note: r.note || null,
-        })),
+      ingredients: named.map((r) => ({
+        name: r.name.trim(),
+        // Already validated above, so this cannot fail here.
+        quantity: (parseQuantity(r.quantity) as { value: number | null }).value,
+        unit: r.unit || null,
+        note: r.note || null,
+      })),
       tags,
     };
 
@@ -313,9 +348,19 @@ export function RecipeForm({
                 <TextField
                   label="Qty"
                   value={row.quantity}
-                  onChange={(e) =>
-                    updateRow(index, { quantity: e.target.value })
-                  }
+                  onChange={(e) => {
+                    updateRow(index, { quantity: e.target.value });
+                    // Cleared as soon as they start fixing it, rather than
+                    // staying red until the next failed submit.
+                    if (quantityIssues.has(index)) {
+                      const next = new Map(quantityIssues);
+                      next.delete(index);
+                      setQuantityIssues(next);
+                    }
+                  }}
+                  error={quantityIssues.has(index)}
+                  helperText={quantityIssues.get(index) ?? ""}
+                  placeholder="1 1/2"
                   sx={{ width: 90 }}
                 />
                 <TextField

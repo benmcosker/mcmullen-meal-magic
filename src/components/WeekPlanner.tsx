@@ -29,6 +29,7 @@ import {
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { groupBySection } from "@/lib/grocery-sections";
 import type { GroceryLine, WeeklySkipRecord } from "@/lib/grocery";
+import { formatQuantity } from "@/lib/quantity";
 import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 
 import { addToPantryAction, skipForWeekAction } from "@/app/plan/skip-actions";
@@ -69,9 +70,7 @@ type PlannedMeal = {
 
 function formatAmount(line: GroceryLine): string {
   if (line.quantity == null) return "";
-  const amount = Number.isInteger(line.quantity)
-    ? String(line.quantity)
-    : String(line.quantity);
+  const amount = formatQuantity(line.quantity);
   return line.unit ? `${amount} ${line.unit}` : amount;
 }
 
