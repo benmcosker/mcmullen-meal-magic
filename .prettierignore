@@ -3,3 +3,7 @@ node_modules/
 src/generated/
 prisma/migrations/
 package-lock.json
+
+# Design references, not source. The .dc.html is the design's source of truth
+# and reformatting it would edit the artefact we are implementing against.
+design_handoff_meal_magic_identity/
