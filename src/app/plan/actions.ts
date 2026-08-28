@@ -6,6 +6,11 @@ import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { aggregateIngredients, getWeekPlan, weekStartOf } from "@/lib/grocery";
 import { getProvider, type HandoffResult } from "@/lib/shopping";
+import { createRecipe } from "@/lib/recipe-mutations";
+import { recipeInput } from "@/lib/recipe-schema";
+import { listPantryItems } from "@/lib/pantry";
+import { suggestSides } from "@/lib/side-suggestions";
+import { findSide } from "@/lib/sides";
 import { textShoppingList } from "@/lib/sms/shopping-list";
 import { requireHousehold } from "@/lib/session";
 
@@ -144,4 +149,136 @@ export async function textShoppingListAction(
 function formatNames(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "nobody";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+export type AcceptSideResult =
+  { ok: true; title: string } | { ok: false; error: string };
+
+/**
+ * Take a suggested side and make it real.
+ *
+ * The side becomes an ordinary recipe belonging to this household - editable,
+ * rateable, and shoppable like anything else - rather than a special kind of
+ * row that every other query would have to know about. Nothing from the
+ * catalogue exists in anybody's library until this runs, which is the same
+ * bargain the suggested pantry staples make.
+ *
+ * Accepting the same side twice reuses the recipe rather than making a second
+ * copy: the catalogue id is remembered in sourceName, which is also what tells
+ * a reader six months later where an unfamiliar recipe came from.
+ */
+export async function acceptSideAction(
+  weekStartIso: string,
+  dateIso: string,
+  sideId: string,
+): Promise<AcceptSideResult> {
+  const { householdId, id: userId } = await requireHousehold();
+
+  const side = findSide(sideId);
+  if (!side) return { ok: false, error: "That side is no longer offered." };
+
+  const marker = `Meal Magic side: ${side.id}`;
+  const date = new Date(`${dateIso}T00:00:00.000Z`);
+
+  try {
+    const existing = await prisma.recipe.findFirst({
+      where: { householdId, sourceName: marker },
+      select: { id: true },
+    });
+
+    const recipeId =
+      existing?.id ??
+      (await createRecipe(
+        recipeInput.parse({
+          title: side.title,
+          description: side.description,
+          servings: side.servings,
+          prepMinutes: side.prepMinutes,
+          cookMinutes: side.cookMinutes,
+          ovenTemp: side.ovenTemp ?? null,
+          ovenTempUnit: side.ovenTempUnit ?? null,
+          equipment: side.equipment,
+          sourceName: marker,
+          instructions: side.instructions,
+          ingredients: side.ingredients,
+          tags: side.tags,
+        }),
+        householdId,
+        userId,
+      ));
+
+    await prisma.plannedMeal.upsert({
+      where: { householdId_date_slot: { householdId, date, slot: "SIDE" } },
+      create: {
+        householdId,
+        date,
+        slot: "SIDE",
+        recipeId,
+        servings: side.servings,
+      },
+      update: { recipeId, servings: side.servings },
+    });
+  } catch (error) {
+    console.error("[sides] could not add the side", error);
+    return { ok: false, error: "That side could not be added. Try again." };
+  }
+
+  revalidatePath("/plan");
+  revalidatePath("/recipes");
+  void weekStartIso;
+  return { ok: true, title: side.title };
+}
+
+export type SideOption = {
+  id: string;
+  title: string;
+  description: string;
+  reasons: string[];
+  minutes: number;
+};
+
+/**
+ * What to put beside the dinner planned on one day.
+ *
+ * Worked out when asked rather than for all seven days up front: it needs the
+ * main's ingredients, equipment and oven temperature, and loading all of that
+ * for a week nobody is going to ask about is a lot of query for a button that
+ * is mostly not pressed.
+ */
+export async function suggestSidesForDayAction(
+  dateIso: string,
+): Promise<SideOption[]> {
+  const { householdId } = await requireHousehold();
+  const date = new Date(`${dateIso}T00:00:00.000Z`);
+
+  const [dinner, pantry] = await Promise.all([
+    prisma.plannedMeal.findUnique({
+      where: { householdId_date_slot: { householdId, date, slot: "DINNER" } },
+      select: {
+        recipe: {
+          select: {
+            title: true,
+            ovenTemp: true,
+            ovenTempUnit: true,
+            equipment: true,
+            ingredients: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    listPantryItems(householdId),
+  ]);
+
+  if (!dinner?.recipe) return [];
+
+  return suggestSides(
+    dinner.recipe,
+    pantry.map((item) => item.name),
+  ).map(({ side, reasons }) => ({
+    id: side.id,
+    title: side.title,
+    description: side.description,
+    reasons,
+    minutes: side.prepMinutes + side.cookMinutes,
+  }));
 }

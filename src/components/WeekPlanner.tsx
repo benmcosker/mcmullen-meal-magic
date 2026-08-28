@@ -35,6 +35,7 @@ import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 import { addToPantryAction, skipForWeekAction } from "@/app/plan/skip-actions";
 
 import { RecipePickerDialog } from "./RecipePickerDialog";
+import { SideSuggestionDialog } from "./SideSuggestionDialog";
 import { RecipeTile, type TileRecipe } from "./RecipeTile";
 import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
 import type { PantryItemRecord } from "@/lib/pantry";
@@ -50,6 +51,7 @@ import { ExcludedIngredients } from "./ExcludedIngredients";
  * and unused enum values cost nothing.
  */
 const MEAL_SLOT: MealSlot = "DINNER";
+const SIDE_SLOT: MealSlot = "SIDE";
 const DAY_NAMES = [
   "Monday",
   "Tuesday",
@@ -111,6 +113,10 @@ export function WeekPlanner({
   );
   const [handoff, setHandoff] = useState<HandoffResult | null>(null);
   const [sendingTo, setSendingTo] = useState<ShoppingProvider | null>(null);
+  const [sidePicking, setSidePicking] = useState<{
+    date: string;
+    day: string;
+  } | null>(null);
   const [texting, setTexting] = useState(false);
   const [textResult, setTextResult] = useState<TextListActionResult | null>(
     null,
@@ -126,11 +132,15 @@ export function WeekPlanner({
   const byKey = new Map(meals.map((m) => [`${m.date}|${m.slot}`, m]));
 
   function assign(date: string, recipeId: string | null) {
+    assignSlot(date, MEAL_SLOT, recipeId);
+  }
+
+  function assignSlot(date: string, slot: MealSlot, recipeId: string | null) {
     const recipe = recipes.find((r) => r.id === recipeId);
     startTransition(async () => {
       await setPlannedMealAction({
         date,
-        slot: MEAL_SLOT,
+        slot,
         recipeId,
         servings: recipe?.servings ?? 4,
       });
@@ -158,6 +168,48 @@ export function WeekPlanner({
 
     setHandoff(await sendWeekToProviderAction(weekStartIso, providerId));
     setSendingTo(null);
+  }
+
+  function SideRow({ date, day }: { date: string; day: string }) {
+    const side = byKey.get(`${date}|${SIDE_SLOT}`);
+    const sideTitle = side
+      ? (recipes.find((r) => r.id === side.recipeId)?.title ?? side.title)
+      : null;
+
+    if (sideTitle) {
+      return (
+        <Stack
+          direction="row"
+          sx={{ alignItems: "center", gap: 0.5, mt: 0.75, minWidth: 0 }}
+        >
+          <Typography variant="caption" color="text.secondary" noWrap>
+            with {sideTitle}
+          </Typography>
+          <Tooltip title={`Remove ${sideTitle}`}>
+            <IconButton
+              size="small"
+              aria-label={`Remove ${sideTitle} from ${day}`}
+              disabled={pending}
+              onClick={() => assignSlot(date, SIDE_SLOT, null)}
+              sx={{ ml: "auto", p: 0.25, flexShrink: 0 }}
+            >
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      );
+    }
+
+    return (
+      <Button
+        size="small"
+        startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+        onClick={() => setSidePicking({ date, day })}
+        sx={{ mt: 0.5, px: 0.5, minWidth: 0, fontSize: "0.7rem" }}
+      >
+        Side
+      </Button>
+    );
   }
 
   return (
@@ -316,12 +368,31 @@ export function WeekPlanner({
                       </Box>
                     )}
                   </CardActionArea>
+
+                  {/*
+                   * The side sits under the main it goes with, rather than in
+                   * a slot of its own on the grid: it is a second dish on the
+                   * same evening, and giving it equal billing would read as
+                   * two dinners.
+                   */}
+                  {planned ? <SideRow date={date} day={day} /> : null}
                 </CardContent>
               </Card>
             </Grid>
           );
         })}
       </Grid>
+
+      <SideSuggestionDialog
+        open={sidePicking !== null}
+        dateIso={sidePicking?.date ?? ""}
+        weekStartIso={weekStartIso}
+        dayLabel={sidePicking?.day ?? ""}
+        onClose={() => {
+          setSidePicking(null);
+          router.refresh();
+        }}
+      />
 
       <RecipePickerDialog
         open={picking !== null}
