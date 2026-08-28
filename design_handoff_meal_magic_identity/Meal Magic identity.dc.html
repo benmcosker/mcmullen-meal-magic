@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,300;1,6..72,400&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#e9e4d8; }
+  a { color:#2f6f4e; text-decoration:none; }
+  a:hover { color:#b4552d; }
+</style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:48px; padding:48px; background:#e9e4d8; font-family:Karla, system-ui, sans-serif;">
+
+  <section data-screen-label="Identity" style="box-sizing:border-box; width:1440px; background:#f7f4ed; padding:64px 72px; display:flex; flex-direction:column; gap:44px; border:1px solid #ded7c8;">
+    <div style="display:flex; align-items:baseline; gap:16px;">
+      <span style="font-family:Karla; font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#b4552d;">Direction</span>
+      <span style="height:1px; flex:1; background:#ded7c8;"></span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:start;">
+      <div style="display:flex; flex-direction:column; gap:28px;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="width:34px; height:34px; border-radius:50%; background:#2f6f4e; display:flex; align-items:center; justify-content:center;"><span style="width:12px; height:12px; border-radius:50%; background:#b4552d;"></span></span>
+          <span style="font-family:Newsreader, serif; font-size:38px; font-weight:400; letter-spacing:-0.015em; color:#1a1815;">Meal <span style="font-style:italic; font-weight:300;">Magic</span></span>
+        </div>
+        <p style="margin:0; font-family:Newsreader, serif; font-size:21px; line-height:1.55; color:#4a453c; max-width:46ch; text-wrap:pretty;">A cookbook the McMullens happen to keep on a screen. Type does the work the chrome used to: a serif for the food, a grotesque for the machinery, and paper underneath instead of white.</p>
+        <div style="display:flex; gap:10px;">
+          <div style="display:flex; flex-direction:column; gap:8px;"><span style="width:104px; height:64px; background:#f7f4ed; border:1px solid #ded7c8;"></span><span style="font-size:10px; letter-spacing:0.1em; color:#8a8272;">PAPER f7f4ed</span></div>
+          <div style="display:flex; flex-direction:column; gap:8px;"><span style="width:104px; height:64px; background:#1a1815;"></span><span style="font-size:10px; letter-spacing:0.1em; color:#8a8272;">INK 1a1815</span></div>
+          <div style="display:flex; flex-direction:column; gap:8px;"><span style="width:104px; height:64px; background:#2f6f4e;"></span><span style="font-size:10px; letter-spacing:0.1em; color:#8a8272;">GREEN 2f6f4e</span></div>
+          <div style="display:flex; flex-direction:column; gap:8px;"><span style="width:104px; height:64px; background:#b4552d;"></span><span style="font-size:10px; letter-spacing:0.1em; color:#8a8272;">CLAY b4552d</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:24px; border-left:1px solid #ded7c8; padding-left:48px;">
+        <div>
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#8a8272; margin-bottom:10px;">Newsreader — dishes, titles, prose</div>
+          <div style="font-family:Newsreader, serif; font-size:52px; line-height:1.05; color:#1a1815; letter-spacing:-0.02em;">Zuni Chicken<br><span style="font-style:italic; font-weight:300;">with Bread Salad</span></div>
+        </div>
+        <div>
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#8a8272; margin-bottom:10px;">Karla — labels, buttons, data</div>
+          <div style="font-family:Karla; font-size:15px; color:#4a453c; line-height:1.7;">Serves 4 · 1 hr 20 min · Roast Chicken<br><span style="font-weight:700; letter-spacing:0.14em; text-transform:uppercase; font-size:12px;">Add to this week</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Recipes" style="width:1440px; background:#f7f4ed; border:1px solid #ded7c8;">
+    <div style="display:flex; align-items:center; gap:34px; padding:20px 56px; border-bottom:1px solid #ded7c8;">
+      <div style="display:flex; align-items:center; gap:10px; margin-right:14px;">
+        <span style="width:24px; height:24px; border-radius:50%; background:#2f6f4e; display:flex; align-items:center; justify-content:center;"><span style="width:9px; height:9px; border-radius:50%; background:#b4552d;"></span></span>
+        <span style="font-family:Newsreader, serif; font-size:23px; color:#1a1815;">Meal <span style="font-style:italic; font-weight:300;">Magic</span></span>
+      </div>
+      <nav style="display:flex; gap:28px; flex:1;">
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#1a1815; border-bottom:2px solid #b4552d; padding-bottom:3px;">Recipes</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272; padding-bottom:3px;">This week</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272; padding-bottom:3px;">Pantry</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272; padding-bottom:3px;">Upload</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272; padding-bottom:3px;">Household</span>
+      </nav>
+      <span style="font-family:Newsreader, serif; font-style:italic; font-size:16px; color:#4a453c;">Ben</span>
+      <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Sign out</span>
+    </div>
+
+    <div style="padding:56px 56px 72px;">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; margin-bottom:36px;">
+        <div>
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#b4552d; margin-bottom:12px;">The McMullen recipe box · 148 dishes</div>
+          <h1 style="margin:0; font-family:Newsreader, serif; font-size:76px; font-weight:400; letter-spacing:-0.03em; line-height:0.95; color:#1a1815;">Recipes</h1>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px; padding-bottom:8px;">
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272; border-bottom:1px solid #ded7c8; padding-bottom:4px;">Filters · 60 tags</span>
+          <span style="background:#1a1815; color:#f7f4ed; font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; padding:14px 22px;">New recipe</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:12px; border-bottom:1px solid #1a1815; padding-bottom:14px; margin-bottom:22px;">
+        <span style="font-family:Newsreader, serif; font-style:italic; font-size:26px; color:#a19684;">What are you in the mood for?</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Newest first ↓</span>
+      </div>
+
+      <div style="display:flex; gap:26px; align-items:center; margin-bottom:56px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#8a8272;">Collections</span>
+        <sc-for list="{{ collections }}" as="c" hint-placeholder-count="6">
+          <span style="font-family:Newsreader, serif; font-size:19px; color:#1a1815; border-bottom:1px solid #ded7c8; padding-bottom:2px;">{{ c.name }} <span style="font-family:Karla; font-size:11px; color:#a19684; letter-spacing:0.06em;">{{ c.count }}</span></span>
+        </sc-for>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1.35fr 1fr; gap:52px; align-items:stretch; margin-bottom:24px; padding-bottom:56px; border-bottom:1px solid #ded7c8;">
+        <div style="height:480px; background:repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px); display:flex; align-items:flex-end; padding:20px;">
+          <span style="font-family:ui-monospace, Menlo, monospace; font-size:11px; color:#8a8272; background:#f7f4ed; padding:5px 9px;">hero photo — zuni chicken, 3:2</span>
+        </div>
+        <div style="display:flex; flex-direction:column; justify-content:center; gap:22px;">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#b4552d;">Added this week</div>
+          <h2 style="margin:0; font-family:Newsreader, serif; font-size:52px; font-weight:400; line-height:1.05; letter-spacing:-0.025em; color:#1a1815; text-wrap:pretty;">Zuni Chicken <span style="font-style:italic; font-weight:300;">with Bread Salad</span></h2>
+          <p style="margin:0; font-family:Newsreader, serif; font-size:20px; line-height:1.6; color:#4a453c; max-width:38ch; text-wrap:pretty;">A small bird, salted a day ahead and roasted hot, over bread that soaks up everything that comes off it.</p>
+          <div style="display:flex; gap:18px; align-items:center; font-size:13px; color:#736c60; letter-spacing:0.03em;">
+            <span>Serves 4</span><span style="color:#ded7c8;">/</span><span>1 hr 20 min</span><span style="color:#ded7c8;">/</span><span style="color:#b4552d; font-weight:600;">475°F oven</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <span style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#6f6a5e; border:1px solid #ded7c8; padding:6px 11px;">Roast Chicken</span>
+            <span style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#6f6a5e; border:1px solid #ded7c8; padding:6px 11px;">American</span>
+            <span style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#6f6a5e; border:1px solid #ded7c8; padding:6px 11px;">Dry-Brined</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:44px 40px; padding-top:44px;">
+        <sc-for list="{{ recipes }}" as="r" hint-placeholder-count="6">
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div style="height:230px; background:repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px); display:flex; align-items:flex-end; padding:12px;">
+              <span style="font-family:ui-monospace, Menlo, monospace; font-size:10px; color:#8a8272; background:#f7f4ed; padding:4px 7px;">{{ r.slug }}</span>
+            </div>
+            <h3 style="margin:0; font-family:Newsreader, serif; font-size:25px; font-weight:400; line-height:1.15; letter-spacing:-0.015em; color:#1a1815; text-wrap:pretty;">{{ r.title }}</h3>
+            <div style="display:flex; gap:12px; font-size:12.5px; color:#736c60; letter-spacing:0.03em;">
+              <span>{{ r.time }}</span><span style="color:#ded7c8;">/</span><span>{{ r.serves }}</span><span style="color:#ded7c8;">/</span><span>{{ r.note }}</span>
+            </div>
+            <div style="height:1px; background:#ded7c8;"></div>
+            <div style="font-size:11px; letter-spacing:0.13em; text-transform:uppercase; color:#a19684;">{{ r.tags }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Recipe" style="width:1440px; background:#f7f4ed; border:1px solid #ded7c8;">
+    <div style="display:flex; align-items:center; gap:34px; padding:20px 56px; border-bottom:1px solid #ded7c8;">
+      <div style="display:flex; align-items:center; gap:10px; margin-right:14px;">
+        <span style="width:24px; height:24px; border-radius:50%; background:#2f6f4e; display:flex; align-items:center; justify-content:center;"><span style="width:9px; height:9px; border-radius:50%; background:#b4552d;"></span></span>
+        <span style="font-family:Newsreader, serif; font-size:23px; color:#1a1815;">Meal <span style="font-style:italic; font-weight:300;">Magic</span></span>
+      </div>
+      <nav style="display:flex; gap:28px; flex:1;">
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#1a1815; border-bottom:2px solid #b4552d; padding-bottom:3px;">Recipes</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">This week</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Pantry</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Upload</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Household</span>
+      </nav>
+      <span style="font-family:Newsreader, serif; font-style:italic; font-size:16px; color:#4a453c;">Ben</span>
+    </div>
+
+    <div style="padding:56px 56px 72px;">
+      <div style="display:grid; grid-template-columns:1fr auto; gap:40px; align-items:end; margin-bottom:34px;">
+        <div>
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#b4552d; margin-bottom:14px;">Beef · Added by Ben, March</div>
+          <h1 style="margin:0; max-width:760px; font-family:Newsreader, serif; font-size:68px; font-weight:400; line-height:0.98; letter-spacing:-0.03em; color:#1a1815; text-wrap:pretty;">New York Strip <span style="font-style:italic; font-weight:300;">with Horseradish-Mint Glaze</span></h1>
+        </div>
+        <div style="display:flex; gap:12px; padding-bottom:8px;">
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#4a453c; border:1px solid #ded7c8; padding:13px 20px;">Edit</span>
+          <span style="background:#2f6f4e; color:#f7f4ed; font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; padding:14px 22px;">Add to this week</span>
+        </div>
+      </div>
+
+      <p style="margin:0 0 32px; font-family:Newsreader, serif; font-style:italic; font-weight:300; font-size:26px; line-height:1.5; color:#4a453c; max-width:62ch; text-wrap:pretty;">This simple yet exquisite preparation for steak was developed by Bobby Flay, the restaurateur and Food Network host.</p>
+
+      <div style="display:flex; align-items:center; gap:22px; padding:16px 0; border-top:1px solid #1a1815; border-bottom:1px solid #ded7c8; margin-bottom:40px; font-size:13px; letter-spacing:0.04em; color:#4a453c;">
+        <span><span style="color:#a19684; text-transform:uppercase; font-size:11px; letter-spacing:0.14em; margin-right:8px;">Serves</span>4</span>
+        <span style="color:#ded7c8;">|</span>
+        <span><span style="color:#a19684; text-transform:uppercase; font-size:11px; letter-spacing:0.14em; margin-right:8px;">Total</span>45 min</span>
+        <span style="color:#ded7c8;">|</span>
+        <span><span style="color:#a19684; text-transform:uppercase; font-size:11px; letter-spacing:0.14em; margin-right:8px;">Rest</span>10 min</span>
+        <span style="color:#ded7c8;">|</span>
+        <span style="color:#b4552d; font-weight:600;">Grill, high</span>
+        <span style="flex:1;"></span>
+        <span style="font-family:Newsreader, serif; font-size:19px; color:#2f6f4e;">★★★★☆ <span style="font-family:Karla; font-size:12px; color:#8a8272; letter-spacing:0.06em;">4.5 · 2 reviews</span></span>
+      </div>
+
+      <div style="height:460px; background:repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px); display:flex; align-items:flex-end; padding:20px; margin-bottom:56px;">
+        <span style="font-family:ui-monospace, Menlo, monospace; font-size:11px; color:#8a8272; background:#f7f4ed; padding:5px 9px;">recipe photo — full width, 3:1</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:320px 1fr; gap:72px; align-items:start;">
+        <div>
+          <div style="font-family:Newsreader, serif; font-size:30px; color:#1a1815; margin-bottom:6px;">Ingredients</div>
+          <div style="height:1px; background:#1a1815; margin-bottom:18px;"></div>
+          <sc-for list="{{ ingredients }}" as="i" hint-placeholder-count="7">
+            <div style="display:flex; gap:14px; padding:11px 0; border-bottom:1px solid #ded7c8; align-items:baseline;">
+              <span style="font-family:Karla; font-weight:700; font-size:13px; letter-spacing:0.04em; color:#2f6f4e; min-width:74px;">{{ i.amount }}</span>
+              <span style="font-family:Newsreader, serif; font-size:18px; color:#1a1815; line-height:1.35;">{{ i.name }}</span>
+            </div>
+          </sc-for>
+          <div style="margin-top:22px; font-size:12px; letter-spacing:0.06em; color:#8a8272; line-height:1.7;">Salt, pepper and olive oil are in your pantry, so they stay off the shopping list.</div>
+        </div>
+
+        <div>
+          <div style="font-family:Newsreader, serif; font-size:30px; color:#1a1815; margin-bottom:6px;">Method</div>
+          <div style="height:1px; background:#1a1815; margin-bottom:26px;"></div>
+          <div style="display:flex; flex-direction:column; gap:26px;">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+              <div style="display:grid; grid-template-columns:56px 1fr; gap:20px; align-items:start;">
+                <span style="font-family:Newsreader, serif; font-size:40px; font-weight:300; color:#b4552d; line-height:0.9;">{{ s.n }}</span>
+                <p style="margin:0; font-family:Newsreader, serif; font-size:20px; line-height:1.62; color:#2c2820; max-width:62ch; text-wrap:pretty;">{{ s.text }}</p>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="This week" style="width:1440px; background:#f7f4ed; border:1px solid #ded7c8;">
+    <div style="display:flex; align-items:center; gap:34px; padding:20px 56px; border-bottom:1px solid #ded7c8;">
+      <div style="display:flex; align-items:center; gap:10px; margin-right:14px;">
+        <span style="width:24px; height:24px; border-radius:50%; background:#2f6f4e; display:flex; align-items:center; justify-content:center;"><span style="width:9px; height:9px; border-radius:50%; background:#b4552d;"></span></span>
+        <span style="font-family:Newsreader, serif; font-size:23px; color:#1a1815;">Meal <span style="font-style:italic; font-weight:300;">Magic</span></span>
+      </div>
+      <nav style="display:flex; gap:28px; flex:1;">
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Recipes</span>
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#1a1815; border-bottom:2px solid #b4552d; padding-bottom:3px;">This week</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Pantry</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Upload</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Household</span>
+      </nav>
+      <span style="font-family:Newsreader, serif; font-style:italic; font-size:16px; color:#4a453c;">Ben</span>
+    </div>
+
+    <div style="padding:56px 56px 72px;">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:40px;">
+        <div>
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#b4552d; margin-bottom:12px;">Mar 17 – 23 · 5 of 7 nights planned</div>
+          <h1 style="margin:0; font-family:Newsreader, serif; font-size:76px; font-weight:400; letter-spacing:-0.03em; line-height:0.95; color:#1a1815;">This <span style="font-style:italic; font-weight:300;">week</span></h1>
+        </div>
+        <div style="display:flex; gap:14px; align-items:center; padding-bottom:8px;">
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">← Last</span>
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Next →</span>
+          <span style="background:#2f6f4e; color:#f7f4ed; font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; padding:14px 22px; margin-left:10px;">Text the list</span>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:14px; margin-bottom:64px;">
+        <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+          <div style="display:flex; flex-direction:column; gap:10px; border-top:1px solid #1a1815; padding-top:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+              <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#1a1815;">{{ d.day }}</span>
+              <span style="font-family:Newsreader, serif; font-size:16px; color:#a19684;">{{ d.date }}</span>
+            </div>
+            <div style="height:120px; background:{{ d.fill }}; display:flex; align-items:center; justify-content:center;">
+              <span style="font-family:Newsreader, serif; font-style:italic; font-size:15px; color:#a19684;">{{ d.empty }}</span>
+            </div>
+            <div style="font-family:Newsreader, serif; font-size:18px; line-height:1.25; color:#1a1815; min-height:44px; text-wrap:pretty;">{{ d.meal }}</div>
+            <div style="font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:#a19684;">{{ d.serves }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 300px; gap:64px; align-items:start;">
+        <div>
+          <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:6px;">
+            <span style="font-family:Newsreader, serif; font-size:34px; color:#1a1815;">Shopping list</span>
+            <span style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#a19684;">23 items · 4 aisles</span>
+          </div>
+          <div style="height:1px; background:#1a1815; margin-bottom:28px;"></div>
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:36px;">
+            <sc-for list="{{ aisles }}" as="a" hint-placeholder-count="4">
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#b4552d;">{{ a.name }}</span>
+                <sc-for list="{{ a.items }}" as="it" hint-placeholder-count="4">
+                  <div style="display:flex; gap:9px; align-items:baseline; font-family:Newsreader, serif; font-size:17px; color:#2c2820; line-height:1.35;">
+                    <span style="width:11px; height:11px; border:1px solid #a19684; flex-shrink:0;"></span>{{ it }}
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="border-left:1px solid #ded7c8; padding-left:36px; display:flex; flex-direction:column; gap:14px;">
+          <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8a8272;">Left off the list</span>
+          <p style="margin:0; font-family:Newsreader, serif; font-size:17px; line-height:1.55; color:#4a453c;">Olive oil, kosher salt, black pepper, flour and butter — you keep those in.</p>
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#2f6f4e; border-bottom:1px solid #2f6f4e; align-self:flex-start; padding-bottom:3px;">Edit pantry</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Pantry" style="width:1440px; background:#f7f4ed; border:1px solid #ded7c8;">
+    <div style="display:flex; align-items:center; gap:34px; padding:20px 56px; border-bottom:1px solid #ded7c8;">
+      <div style="display:flex; align-items:center; gap:10px; margin-right:14px;">
+        <span style="width:24px; height:24px; border-radius:50%; background:#2f6f4e; display:flex; align-items:center; justify-content:center;"><span style="width:9px; height:9px; border-radius:50%; background:#b4552d;"></span></span>
+        <span style="font-family:Newsreader, serif; font-size:23px; color:#1a1815;">Meal <span style="font-style:italic; font-weight:300;">Magic</span></span>
+      </div>
+      <nav style="display:flex; gap:28px; flex:1;">
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Recipes</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">This week</span>
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#1a1815; border-bottom:2px solid #b4552d; padding-bottom:3px;">Pantry</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Upload</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Household</span>
+      </nav>
+      <span style="font-family:Newsreader, serif; font-style:italic; font-size:16px; color:#4a453c;">Ben</span>
+    </div>
+
+    <div style="padding:56px 56px 80px; display:grid; grid-template-columns:1fr 380px; gap:80px; align-items:start;">
+      <div>
+        <h1 style="margin:0 0 16px; font-family:Newsreader, serif; font-size:76px; font-weight:400; letter-spacing:-0.03em; line-height:0.95; color:#1a1815;">Pantry</h1>
+        <p style="margin:0 0 44px; font-family:Newsreader, serif; font-style:italic; font-weight:300; font-size:24px; line-height:1.5; color:#4a453c; max-width:44ch;">Things you always have in. These never reach the weekly shopping list, however many recipes call for them.</p>
+
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8a8272; margin-bottom:16px;">In the cupboard · 14</div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:52px;">
+          <sc-for list="{{ pantry }}" as="p" hint-placeholder-count="14">
+            <span style="font-family:Newsreader, serif; font-size:19px; color:#1a1815; background:#efe9dc; padding:9px 16px; display:flex; gap:10px; align-items:center;">{{ p }}<span style="font-family:Karla; font-size:13px; color:#a19684;">×</span></span>
+          </sc-for>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
+          <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8a8272;">Common staples</span>
+          <span style="height:1px; flex:1; background:#ded7c8;"></span>
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#2f6f4e;">Add all 5</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <sc-for list="{{ staples }}" as="s" hint-placeholder-count="5">
+            <span style="font-family:Newsreader, serif; font-size:19px; color:#6f6a5e; border:1px dashed #cfc6b2; padding:9px 16px;">+ {{ s }}</span>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="border:1px solid #1a1815; padding:32px; display:flex; flex-direction:column; gap:18px;">
+        <span style="font-family:Newsreader, serif; font-size:26px; color:#1a1815;">Add a staple</span>
+        <div style="border-bottom:1px solid #1a1815; padding-bottom:10px; font-family:Newsreader, serif; font-style:italic; font-size:20px; color:#a19684;">Olive oil</div>
+        <span style="background:#1a1815; color:#f7f4ed; font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; padding:14px 22px; text-align:center;">Add</span>
+        <p style="margin:0; font-size:13px; line-height:1.7; color:#8a8272;">Anything here disappears from every shopping list from now on. Remove it and it comes back.</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Household" style="width:1440px; background:#f7f4ed; border:1px solid #ded7c8;">
+    <div style="display:flex; align-items:center; gap:34px; padding:20px 56px; border-bottom:1px solid #ded7c8;">
+      <div style="display:flex; align-items:center; gap:10px; margin-right:14px;">
+        <span style="width:24px; height:24px; border-radius:50%; background:#2f6f4e; display:flex; align-items:center; justify-content:center;"><span style="width:9px; height:9px; border-radius:50%; background:#b4552d;"></span></span>
+        <span style="font-family:Newsreader, serif; font-size:23px; color:#1a1815;">Meal <span style="font-style:italic; font-weight:300;">Magic</span></span>
+      </div>
+      <nav style="display:flex; gap:28px; flex:1;">
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Recipes</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">This week</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Pantry</span>
+        <span style="font-size:12px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#8a8272;">Upload</span>
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#1a1815; border-bottom:2px solid #b4552d; padding-bottom:3px;">Household</span>
+      </nav>
+      <span style="font-family:Newsreader, serif; font-style:italic; font-size:16px; color:#4a453c;">Ben</span>
+    </div>
+
+    <div style="padding:56px 56px 80px;">
+      <div style="margin-bottom:48px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#b4552d; margin-bottom:12px;">One library · one plan · one list</div>
+        <h1 style="margin:0; font-family:Newsreader, serif; font-size:76px; font-weight:400; letter-spacing:-0.03em; line-height:0.95; color:#1a1815;">The <span style="font-style:italic; font-weight:300;">McMullens</span></h1>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 360px; gap:72px; align-items:start;">
+        <div>
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:8px;">
+            <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8a8272;">At the table</span>
+            <span style="height:1px; flex:1; background:#1a1815;"></span>
+          </div>
+          <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; gap:20px; padding:20px 0; border-bottom:1px solid #ded7c8;">
+              <span style="width:52px; height:52px; border-radius:50%; background:#efe9dc; border:1px solid #ded7c8; display:flex; align-items:center; justify-content:center; font-family:Newsreader, serif; font-size:21px; color:#2f6f4e; flex-shrink:0;">{{ m.initial }}</span>
+              <div style="flex:1;">
+                <div style="font-family:Newsreader, serif; font-size:24px; color:#1a1815; line-height:1.2;">{{ m.name }}</div>
+                <div style="font-size:13px; color:#8a8272; letter-spacing:0.03em; margin-top:2px;">{{ m.contact }}</div>
+              </div>
+              <span style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#6f6a5e;">{{ m.role }}</span>
+            </div>
+          </sc-for>
+          <div style="display:flex; align-items:center; gap:20px; padding:20px 0;">
+            <span style="width:52px; height:52px; border-radius:50%; border:1px dashed #cfc6b2; display:flex; align-items:center; justify-content:center; font-family:Newsreader, serif; font-size:24px; color:#a19684; flex-shrink:0;">+</span>
+            <span style="font-family:Newsreader, serif; font-style:italic; font-size:21px; color:#6f6a5e;">Invite someone to cook from this box</span>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:32px;">
+          <div style="border:1px solid #1a1815; padding:28px; display:flex; flex-direction:column; gap:12px;">
+            <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#b4552d;">Pending invite</span>
+            <div style="font-family:Newsreader, serif; font-size:22px; color:#1a1815;">kate@example.com</div>
+            <div style="font-family:ui-monospace, Menlo, monospace; font-size:19px; letter-spacing:0.22em; color:#2f6f4e; background:#efe9dc; padding:12px 14px;">7QK4-2M</div>
+            <div style="font-size:12px; color:#8a8272; letter-spacing:0.04em;">Expires in 6 days</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8a8272;">Shopping texts</span>
+            <p style="margin:0; font-family:Newsreader, serif; font-size:17px; line-height:1.55; color:#4a453c;">Sent to Ben and Sarah on Sunday evening. Two members have no number on file.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1536,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      collections: [
+        { name: "Weeknight", count: "24" },
+        { name: "Sunday cooking", count: "11" },
+        { name: "Grill", count: "9" },
+        { name: "Pasta", count: "7" },
+        { name: "One pot", count: "5" },
+        { name: "Comfort", count: "7" },
+      ],
+      recipes: [
+        { slug: "strip-steak.jpg", title: "Bobby Flay's New York Strip Steak with Horseradish-Mint Glaze", time: "45 min", serves: "Serves 4", note: "Grill", tags: "Beef · Steak · American" },
+        { slug: "pulled-pork.jpg", title: "Hickory-Smoked Barbecue Pulled Pork Sandwiches", time: "6 hr", serves: "Serves 8", note: "Smoker", tags: "Pork · Summer · American" },
+        { slug: "gnocchi.jpg", title: "Sheet Pan Gnocchi with Broccolini", time: "30 min", serves: "Serves 4", note: "425°F", tags: "Sheet Pan · Vegetarian" },
+        { slug: "ramen.jpg", title: "Weeknight Shoyu Ramen", time: "40 min", serves: "Serves 2", note: "Stovetop", tags: "Japanese · Noodles" },
+        { slug: "tostadas.jpg", title: "Black Bean Tostadas with Quick Slaw", time: "25 min", serves: "Serves 4", note: "Skillet", tags: "Mexican · Quick" },
+        { slug: "chicken-thighs.jpg", title: "Cast Iron Chicken Thighs with Lemon", time: "50 min", serves: "Serves 4", note: "Cast iron", tags: "Chicken · One Pan" },
+      ],
+      ingredients: [
+        { amount: "4", name: "New York strip steaks, 1½ in thick" },
+        { amount: "1/4 cup", name: "prepared horseradish, drained" },
+        { amount: "1/4 cup", name: "mint leaves, finely chopped" },
+        { amount: "2 tbsp", name: "honey" },
+        { amount: "2 tbsp", name: "red wine vinegar" },
+        { amount: "1 clove", name: "garlic, grated" },
+        { amount: "to taste", name: "kosher salt and black pepper" },
+      ],
+      steps: [
+        { n: "1", text: "Take the steaks out of the fridge forty minutes before you cook them and salt them generously on both sides." },
+        { n: "2", text: "Whisk the horseradish, mint, honey, vinegar and garlic together. Let it sit while the grill heats — it wants the time." },
+        { n: "3", text: "Grill over high heat, four to five minutes a side for medium-rare, turning once. Move them off the direct heat if the fat flares." },
+        { n: "4", text: "Rest ten minutes, then spoon the glaze over and slice against the grain." },
+      ],
+      week: [
+        { day: "Mon", date: "17", fill: "repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px)", empty: "", meal: "Weeknight Shoyu Ramen", serves: "Serves 2" },
+        { day: "Tue", date: "18", fill: "repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px)", empty: "", meal: "Sheet Pan Gnocchi", serves: "Serves 4" },
+        { day: "Wed", date: "19", fill: "#efe9dc", empty: "nothing yet", meal: "", serves: "" },
+        { day: "Thu", date: "20", fill: "repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px)", empty: "", meal: "Black Bean Tostadas", serves: "Serves 4" },
+        { day: "Fri", date: "21", fill: "repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px)", empty: "", meal: "New York Strip Steak", serves: "Serves 4" },
+        { day: "Sat", date: "22", fill: "#efe9dc", empty: "eating out", meal: "", serves: "" },
+        { day: "Sun", date: "23", fill: "repeating-linear-gradient(135deg,#e8e0d0 0 11px,#e1d8c5 11px 22px)", empty: "", meal: "Zuni Chicken with Bread Salad", serves: "Serves 4" },
+      ],
+      aisles: [
+        { name: "Produce", items: ["2 lemons", "Broccolini, 1 lb", "Mint, 1 bunch", "Napa cabbage", "Scallions"] },
+        { name: "Meat & fish", items: ["4 strip steaks", "Chicken thighs, 2 lb", "Whole chicken, 3 lb"] },
+        { name: "Dairy", items: ["Parmesan", "Crème fraîche", "Eggs, dozen"] },
+        { name: "Dry goods", items: ["Gnocchi, 2 pkg", "Ramen noodles", "Black beans, 2 cans", "Corn tortillas"] },
+      ],
+      pantry: ["Olive oil", "Kosher salt", "Black pepper", "Flour", "Butter", "Sugar", "Soy sauce", "Rice vinegar", "Garlic", "Onions", "Honey", "Dijon", "Bay leaves", "Chili flakes"],
+      staples: ["Baking soda", "Cornstarch", "Sesame oil", "Tomato paste", "Vanilla"],
+      members: [
+        { initial: "B", name: "Ben McOsker", initials: "B", contact: "ben@example.com · (415) 555-0142", role: "Added 96 recipes" },
+        { initial: "S", name: "Sarah McMullen", contact: "sarah@example.com · (415) 555-0177", role: "Added 41 recipes" },
+        { initial: "T", name: "Theo", contact: "No number on file", role: "Added 6 recipes" },
+        { initial: "M", name: "Maya", contact: "No number on file", role: "Added 5 recipes" },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
