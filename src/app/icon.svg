@@ -1,17 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Meal Magic">
   <!--
-    The same fork and knife the recipe placeholders use, on the app's green.
+    The wordmark's mark: a clay dot in a green field.
 
     A filled tile rather than a bare glyph: a favicon sits on a tab strip whose
-    colour the browser chooses, and an unbacked mark in the brand green vanishes
-    against a dark one. White on green survives both themes.
+    colour the browser chooses, and an unbacked mark vanishes against a dark
+    one. The tile carries its own background, so it survives both.
 
-    The glyph is Material's "restaurant" path on its native 24-unit grid,
-    scaled to 0.95 and offset by 4.6 on both axes - which centres its 18x20
-    bounding box, not the 24x24 box it is drawn in.
+    The dot is 0.375 of the tile, the same ratio as the 9px dot in the 24px
+    circle beside the wordmark in the top bar, so the two read as one mark at
+    two sizes rather than as two drawings.
+
+    A placeholder device, like the wordmark it comes from - expect it to be
+    replaced by a finished logo.
   -->
   <rect width="32" height="32" rx="7" fill="#2f6f4e"/>
-  <g transform="translate(4.6 4.6) scale(0.95)" fill="#ffffff">
-    <path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/>
-  </g>
+  <circle cx="16" cy="16" r="6" fill="#b4552d"/>
 </svg>
