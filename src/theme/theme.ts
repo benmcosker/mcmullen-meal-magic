@@ -1,43 +1,348 @@
 "use client";
 
-import { createTheme } from "@mui/material/styles";
+import { createTheme, type ThemeOptions } from "@mui/material/styles";
 
 /**
+ * The Meal Magic identity: a modern cookbook rather than a dashboard.
+ *
+ * Three rules do most of the work, and all three live here rather than in the
+ * pages: warm paper instead of white, hairline rules instead of borders and
+ * shadows, and square corners everywhere. MUI's default 10px radius on every
+ * card, chip, button and input was a large part of what made the app read as
+ * generic, so `shape.borderRadius` is 0 and separation comes from whitespace.
+ *
  * One theme, both colour schemes. MUI resolves light/dark from the user's
- * system preference via CSS variables, so there is no flash of the wrong
- * theme on first paint and no client-side toggle to hydrate.
+ * system preference via CSS variables, so there is no flash of the wrong theme
+ * on first paint and no client-side toggle to hydrate. The identity pass is a
+ * light-scheme design; dark keeps its existing greens and gets the new tokens
+ * mapped to sensible equivalents so nothing renders undefined, but it has not
+ * been designed and is due a pass of its own.
  */
-export const theme = createTheme({
+
+declare module "@mui/material/styles" {
+  interface TypeText {
+    /** Long-form body copy - method steps. Softer than `primary`. */
+    soft: string;
+    /** Secondary prose: descriptions, values in a metadata row. */
+    muted: string;
+    /** Tertiary text and outlined-chip labels. */
+    mutedLight: string;
+  }
+  interface TypeBackground {
+    /** Filled chips, code blocks, avatar fills, empty planner days. */
+    raised: string;
+    /** Photo-placeholder stripe, light band. */
+    stripeA: string;
+    /** Photo-placeholder stripe, dark band. */
+    stripeB: string;
+  }
+  interface Palette {
+    /** Near-black. Primary buttons and the emphatic rule above a section. */
+    ink: Palette["primary"];
+    /** For dashed borders: suggested staples, the invite avatar. */
+    dividerDashed: string;
+  }
+  interface PaletteOptions {
+    ink?: PaletteOptions["primary"];
+    dividerDashed?: string;
+  }
+}
+
+declare module "@mui/material/Button" {
+  interface ButtonPropsColorOverrides {
+    ink: true;
+  }
+}
+
+/**
+ * Referenced by name in `sx` where a variant would be the wrong unit of reuse -
+ * an ingredient amount inside a row, say. Exported so pages do not each
+ * hand-roll the fallback stack.
+ */
+export const fonts = {
+  serif: 'var(--font-newsreader), Georgia, "Times New Roman", serif',
+  sans: 'var(--font-karla), system-ui, -apple-system, "Segoe UI", sans-serif',
+  mono: 'ui-monospace, Menlo, Monaco, "Cascadia Code", monospace',
+} as const;
+
+const { serif, sans } = fonts;
+
+/**
+ * Built in two passes so the typography and component overrides can read the
+ * breakpoints and the resolved palette instead of restating pixel widths and
+ * hexes that would then drift.
+ */
+const base = createTheme({
   cssVariables: { colorSchemeSelector: "media" },
+  shape: { borderRadius: 0 },
   colorSchemes: {
     light: {
       palette: {
         primary: { main: "#2f6f4e" },
         secondary: { main: "#b4552d" },
-        background: { default: "#fbfaf7", paper: "#ffffff" },
+        // Deliberately the same as `default`. Nothing in this design is a
+        // raised surface, so a card that quietly paints itself white would
+        // be the one thing on the page breaking the paper.
+        background: {
+          default: "#f7f4ed",
+          paper: "#f7f4ed",
+          raised: "#efe9dc",
+          stripeA: "#e8e0d0",
+          stripeB: "#e1d8c5",
+        },
+        text: {
+          primary: "#1a1815",
+          soft: "#2c2820",
+          muted: "#4a453c",
+          mutedLight: "#6f6a5e",
+          secondary: "#8a8272",
+          disabled: "#a19684",
+        },
+        // `light`/`dark` are spelled out rather than left to MUI: custom
+        // palette keys skip augmentColor, and Button's contained hover reads
+        // `.dark` straight off the palette.
+        ink: {
+          main: "#1a1815",
+          light: "#2c2820",
+          dark: "#000000",
+          contrastText: "#f7f4ed",
+        },
+        divider: "#ded7c8",
+        dividerDashed: "#cfc6b2",
       },
     },
     dark: {
       palette: {
         primary: { main: "#7fc4a0" },
         secondary: { main: "#e08a5f" },
-        background: { default: "#12140f", paper: "#1b1e18" },
+        background: {
+          default: "#12140f",
+          paper: "#1b1e18",
+          raised: "#22261e",
+          stripeA: "#1e221a",
+          stripeB: "#242820",
+        },
+        text: {
+          primary: "#f2eee3",
+          soft: "#e7e2d6",
+          muted: "#cfc8b8",
+          mutedLight: "#b0a996",
+          secondary: "#8f8878",
+          disabled: "#6f6a5e",
+        },
+        ink: {
+          main: "#e7e2d6",
+          light: "#f4efe4",
+          dark: "#cfc8b8",
+          contrastText: "#12140f",
+        },
+        divider: "#2b2f27",
+        dividerDashed: "#3a3f34",
       },
     },
   },
-  shape: { borderRadius: 10 },
+});
+
+const identity: ThemeOptions = {
   typography: {
-    fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-    h1: { fontSize: "2.25rem", fontWeight: 700, letterSpacing: "-0.02em" },
-    h2: { fontSize: "1.5rem", fontWeight: 600, letterSpacing: "-0.01em" },
-    h3: { fontSize: "1.15rem", fontWeight: 600 },
+    fontFamily: sans,
+
+    // Page titles. 76px is a lot of type, and on a phone it is four words a
+    // line, so it steps down rather than wrapping "Household" mid-word.
+    h1: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "4.75rem",
+      lineHeight: 0.95,
+      letterSpacing: "-0.03em",
+      [base.breakpoints.down("sm")]: { fontSize: "3rem" },
+    },
+    // Section heads: "Ingredients", "Method", "Shopping list".
+    h2: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "2.125rem",
+      lineHeight: 1.15,
+      letterSpacing: "-0.02em",
+      [base.breakpoints.down("sm")]: { fontSize: "1.75rem" },
+    },
+    // Card titles in the recipe grid.
+    h3: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "1.5625rem",
+      lineHeight: 1.15,
+      letterSpacing: "-0.015em",
+    },
+    // Panel headings: "Add a staple".
+    h4: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "1.625rem",
+      lineHeight: 1.2,
+      letterSpacing: "-0.015em",
+    },
+    h5: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "1.3125rem",
+      lineHeight: 1.25,
+    },
+    h6: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "1.1875rem",
+      lineHeight: 1.3,
+    },
+
+    // The lede: a recipe's description, the pantry intro.
+    subtitle1: {
+      fontFamily: serif,
+      fontWeight: 300,
+      fontStyle: "italic",
+      fontSize: "1.5rem",
+      lineHeight: 1.5,
+      [base.breakpoints.down("sm")]: { fontSize: "1.25rem" },
+    },
+    subtitle2: {
+      fontFamily: sans,
+      fontWeight: 600,
+      fontSize: "0.8125rem",
+      letterSpacing: "0.03em",
+    },
+
+    // Prose is serif; data is not. `body2` is the app's metadata workhorse -
+    // times, counts, servings - so it stays on Karla.
+    body1: {
+      fontFamily: serif,
+      fontWeight: 400,
+      fontSize: "1.0625rem",
+      lineHeight: 1.55,
+    },
+    body2: {
+      fontFamily: sans,
+      fontWeight: 400,
+      fontSize: "0.8125rem",
+      lineHeight: 1.55,
+      letterSpacing: "0.03em",
+    },
+
+    button: {
+      fontFamily: sans,
+      fontWeight: 700,
+      fontSize: "0.75rem",
+      letterSpacing: "0.14em",
+      textTransform: "uppercase",
+    },
+    caption: {
+      fontFamily: sans,
+      fontWeight: 400,
+      fontSize: "0.78125rem",
+      lineHeight: 1.7,
+      letterSpacing: "0.04em",
+    },
+    // The clay eyebrow above a page title. Colour is per-use; the metrics are not.
+    overline: {
+      fontFamily: sans,
+      fontWeight: 700,
+      fontSize: "0.6875rem",
+      lineHeight: 1.4,
+      letterSpacing: "0.18em",
+      textTransform: "uppercase",
+    },
   },
+
   components: {
     MuiButton: {
       defaultProps: { disableElevation: true },
-      styleOverrides: { root: { textTransform: "none", fontWeight: 600 } },
+      styleOverrides: {
+        contained: { padding: "14px 22px" },
+        outlined: ({ theme }) => ({
+          padding: "13px 20px",
+          borderColor: theme.palette.divider,
+          color: theme.palette.text.muted,
+          "&:hover": {
+            borderColor: theme.palette.text.primary,
+            color: theme.palette.text.primary,
+            backgroundColor: "transparent",
+          },
+        }),
+        text: ({ theme }) => ({
+          padding: "6px 2px",
+          color: theme.palette.text.secondary,
+          "&:hover": {
+            color: theme.palette.text.primary,
+            backgroundColor: "transparent",
+          },
+        }),
+        sizeSmall: { fontSize: "0.6875rem", letterSpacing: "0.12em" },
+      },
     },
-    MuiCard: { defaultProps: { variant: "outlined" } },
+
+    // Outlined by default and flat: the separation these designs use is a
+    // hairline and whitespace, never a shadow.
+    MuiCard: {
+      defaultProps: { variant: "outlined", elevation: 0 },
+    },
+
+    MuiChip: {
+      styleOverrides: {
+        // No text-transform here on purpose. Chips carry tags, pantry items
+        // and timings, and only the tags are uppercase in the design.
+        //
+        // The radius is spelled out because Chip is the one component that
+        // hard-codes its own: MUI sets 16px on the root rather than reading
+        // `shape.borderRadius`, so a pill survives the square-corner rule
+        // unless it is overridden here.
+        root: { borderRadius: 0, fontFamily: sans, letterSpacing: "0.06em" },
+        outlined: ({ theme }) => ({
+          borderColor: theme.palette.divider,
+          color: theme.palette.text.mutedLight,
+        }),
+        filled: ({ theme }) => ({
+          backgroundColor: theme.palette.background.raised,
+          color: theme.palette.text.primary,
+        }),
+      },
+    },
+
     MuiTextField: { defaultProps: { size: "small" } },
+
+    // Field text is serif - it is the thing you wrote, and the search field's
+    // "What are you in the mood for?" is Newsreader by design. The label
+    // naming the field is machinery, so it stays on Karla.
+    MuiFormLabel: {
+      styleOverrides: { root: { fontFamily: sans, letterSpacing: "0.03em" } },
+    },
+
+    MuiLink: {
+      defaultProps: { underline: "none" },
+      styleOverrides: {
+        root: ({ theme }) => ({
+          color: theme.palette.primary.main,
+          "&:hover": { color: theme.palette.secondary.main },
+        }),
+      },
+    },
+
+    MuiAppBar: {
+      defaultProps: { elevation: 0, color: "transparent" },
+    },
+
+    // A bare <a> - one written by hand rather than through MuiLink - would
+    // otherwise arrive in the browser's blue and underlined, which is the
+    // loudest thing on a page made of paper and hairlines. Element selector,
+    // so any component that sets its own colour still wins.
+    MuiCssBaseline: {
+      styleOverrides: ({ palette }) => ({
+        a: {
+          color: palette.primary.main,
+          textDecoration: "none",
+          "&:hover": { color: palette.secondary.main },
+        },
+      }),
+    },
   },
-});
+};
+
+export const theme = createTheme(base, identity);
