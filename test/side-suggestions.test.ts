@@ -13,9 +13,9 @@ const main = (over: Partial<MainDish> = {}): MainDish => ({
 });
 
 describe("the catalogue", () => {
-  it("has fifteen sides with distinct ids", () => {
-    expect(SIDES).toHaveLength(15);
-    expect(new Set(SIDES.map((s) => s.id)).size).toBe(15);
+  it("has sixteen sides with distinct ids", () => {
+    expect(SIDES).toHaveLength(16);
+    expect(new Set(SIDES.map((s) => s.id)).size).toBe(16);
   });
 
   it("gives every side an oven unit whenever it gives a temperature", () => {
@@ -167,7 +167,7 @@ describe("suggestSides", () => {
   });
 
   it("orders sides that score the same alphabetically", () => {
-    // Equal scores are common with fifteen sides and four signals. Without a
+    // Equal scores are common with sixteen sides and four signals. Without a
     // tie-break the order falls out of however the catalogue happens to be
     // written, which is not a reason a reader could ever infer.
     const all = suggestSides(main(), [], 15);
