@@ -1,6 +1,12 @@
-import RestaurantIcon from "@mui/icons-material/Restaurant";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+
+/**
+ * Ruled paper where the picture will go. The theme owns the two tones; this
+ * names them through the CSS variables MUI emits for them.
+ */
+const STRIPE =
+  "repeating-linear-gradient(135deg, var(--mui-palette-background-stripeA) 0 11px, var(--mui-palette-background-stripeB) 11px 22px)";
 
 /**
  * What a recipe looks like before it has a photo.
@@ -10,43 +16,27 @@ import Typography from "@mui/material/Typography";
  * photo of someone else's dinner. It also keeps a grid of cards the same
  * height, which is most of why this exists.
  *
+ * The diagonal stripe is the identity pass's treatment: it reads as ruled paper
+ * where the picture will go rather than as an image that failed to load. It
+ * replaces a per-recipe tinted gradient, which gave every dish a stable colour
+ * you could learn - genuinely useful for picking a tile out of a grid, and
+ * given up because a page of pastel rectangles was the loudest thing on a
+ * design built from paper and hairlines. The initials carry what recognition
+ * is left.
+ *
  * No directive of its own, so it renders on the server inside the recipe pages
  * and gets bundled with the client where a client component uses it.
  */
-
-/**
- * A stable hue per recipe.
- *
- * Deliberately derived from the recipe's own id rather than picked at random:
- * the same dish keeps the same colour on every page and across reloads, so the
- * tile you are looking for stays recognisable in a grid. Any change to the
- * recipe leaves it alone, because the id never changes.
- */
-function hueFor(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  // Skips the 55-90 band, where the tints go the colour of an unwell salad.
-  const hue = hash % 325;
-  return hue < 55 ? hue : hue + 35;
-}
-
 export function RecipePlaceholder({
-  seed,
   title,
   height,
   showTitle = false,
 }: {
-  /** Anything stable per recipe; the id is ideal. */
-  seed: string;
   title: string;
   height: number | { xs: number; sm?: number; md?: number };
   /** Adds the dish's initials, for placeholders large enough to carry them. */
   showTitle?: boolean;
 }) {
-  const hue = hueFor(seed);
-
   return (
     <Box
       // Decorative. The title is always beside or below this in real text, so
@@ -55,27 +45,19 @@ export function RecipePlaceholder({
       sx={{
         width: "100%",
         height,
-        borderRadius: 1,
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 0.75,
-        // Two stops of the same hue rather than a flat fill: a large flat
-        // rectangle reads as a failed image, a gradient reads as a choice.
-        // Low saturation and alpha so it sits behind the text in either
-        // theme rather than competing with it.
-        background: `linear-gradient(135deg,
-          hsl(${hue} 55% 55% / 0.20),
-          hsl(${(hue + 40) % 360} 55% 55% / 0.09))`,
-        color: `hsl(${hue} 45% 45%)`,
-        // The same hue is too dark to read on a dark background, so lift it.
-        "@media (prefers-color-scheme: dark)": {
-          color: `hsl(${hue} 45% 72%)`,
-        },
+        // The CSS variables by name rather than an `sx` callback.
+        //
+        // A callback is a function, and a function cannot cross from a server
+        // component into MUI's client-side Box - this component renders inside
+        // server pages, so it would fail at render while typechecking and
+        // building cleanly. Naming the variables keeps the stripe following the
+        // colour scheme without anything having to be resolved at render time.
+        background: STRIPE,
       }}
     >
-      <RestaurantIcon fontSize={showTitle ? "large" : "small"} />
       {showTitle ? (
         <Typography
           variant="h3"
@@ -83,7 +65,7 @@ export function RecipePlaceholder({
           // decoration beside the real title, and emitting an <h3> for them
           // puts a second, meaningless entry in the page's heading outline.
           component="span"
-          sx={{ letterSpacing: 1, opacity: 0.85, fontWeight: 700 }}
+          sx={{ color: "text.disabled", letterSpacing: "0.06em" }}
         >
           {initials(title)}
         </Typography>

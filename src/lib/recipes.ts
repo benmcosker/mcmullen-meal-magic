@@ -239,3 +239,13 @@ export function slugifyTag(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+/**
+ * How many dishes are in the box, whoever added them.
+ *
+ * Unscoped like the rest of the library reads: the count names the shared
+ * collection, not the caller's share of it.
+ */
+export async function countRecipes(): Promise<number> {
+  return prisma.recipe.count();
+}

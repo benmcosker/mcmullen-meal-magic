@@ -1,31 +1,37 @@
 "use client";
 
-import SearchIcon from "@mui/icons-material/Search";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
-import InputAdornment from "@mui/material/InputAdornment";
+import Button from "@mui/material/Button";
+import InputBase from "@mui/material/InputBase";
+import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
-import { RECIPE_SORTS, type RecipeSort } from "@/lib/recipe-sort";
 import { useEffect, useState } from "react";
 
-type TagOption = { name: string; slug: string; count: number };
+import { RECIPE_SORTS, type RecipeSort } from "@/lib/recipe-sort";
 
 /**
- * Search state lives in the URL so a filtered view can be linked and survives
- * a reload. Typing is debounced to avoid a query per keystroke.
+ * One line: what you are looking for, and the order to show it in.
+ *
+ * Search state lives in the URL so a filtered view can be linked and survives a
+ * reload. Typing is debounced to avoid a query per keystroke.
+ *
+ * The field has no box - just the rule it shares with the sort control, which
+ * is the point of the treatment: at 26px serif italic the placeholder is an
+ * invitation rather than a form field, and "What are you in the mood for?" only
+ * works if it does not look like something to fill in.
+ *
+ * The tag chips that used to sit below this have moved behind the Filters
+ * control in the page header; the collections row covers the common ways in.
  */
-export function RecipeSearchBar({ tags }: { tags: TagOption[] }) {
+export function RecipeSearchBar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const activeTags = searchParams.getAll("tag");
   const sort = (searchParams.get("sort") ?? "newest") as RecipeSort;
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const [sortAnchor, setSortAnchor] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const current = searchParams.get("q") ?? "";
@@ -48,89 +54,84 @@ export function RecipeSearchBar({ tags }: { tags: TagOption[] }) {
     if (next === "newest") params.delete("sort");
     else params.set("sort", next);
     router.replace(`${pathname}?${params.toString()}`);
+    setSortAnchor(null);
   }
 
-  function toggleTag(slug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    const next = activeTags.includes(slug)
-      ? activeTags.filter((t) => t !== slug)
-      : [...activeTags, slug];
-
-    params.delete("tag");
-    for (const tag of next) params.append("tag", tag);
-    router.replace(`${pathname}?${params.toString()}`);
-  }
+  const sortLabel =
+    RECIPE_SORTS.find((option) => option.value === sort)?.label ??
+    "Newest first";
 
   return (
-    <Stack spacing={2} sx={{ mb: 3 }}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-        <TextField
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search recipes, ingredients, tags…"
-          fullWidth
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        // On a phone the invitation and the sort control do not both fit, and
+        // "What are you in the mood" cut off mid-phrase reads as broken rather
+        // than as truncated. Wrapping puts the sort on a second line under the
+        // same rule instead.
+        flexWrap: { xs: "wrap", sm: "nowrap" },
+        columnGap: 1.5,
+        rowGap: 1,
+        // The emphatic rule rather than the hairline: this one separates the
+        // way in from the library, not one row from the next.
+        borderBottom: "1px solid",
+        borderColor: "text.primary",
+        pb: "14px",
+        mb: "22px",
+      }}
+    >
+      <InputBase
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="What are you in the mood for?"
+        // The placeholder says what the field is for, and a visible label above
+        // it would undo the treatment.
+        inputProps={{ "aria-label": "Search recipes" }}
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          flexBasis: { xs: "100%", sm: "auto" },
+          // Serif, taken from the variant rather than a restated font stack.
+          fontFamily: (theme) => theme.typography.body1.fontFamily,
+          fontSize: { xs: "1.25rem", md: "1.625rem" },
+          color: "text.primary",
+          "& input::placeholder": {
+            fontStyle: "italic",
+            color: (theme) => theme.palette.text.disabled,
+            // Browsers dim placeholders by default, which on this palette
+            // leaves it almost invisible.
+            opacity: 1,
+          },
+        }}
+      />
 
-        <TextField
-          select
-          label="Sort"
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          sx={{ minWidth: { sm: 190 } }}
-        >
-          {RECIPE_SORTS.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Stack>
-
-      {tags.length > 0 ? (
-        /*
-         * One scrolling row on a phone, wrapped everywhere else.
-         *
-         * A dozen tags wrap to four rows on a narrow screen and push the first
-         * recipe off the bottom - the filter ends up costing more space than
-         * the thing it filters. Sideways they stay reachable without taking
-         * the screen.
-         */
-        <Box
-          sx={{
-            display: "flex",
-            gap: 1,
-            flexWrap: { xs: "nowrap", sm: "wrap" },
-            overflowX: { xs: "auto", sm: "visible" },
-            // Room for the chips' focus ring, which the overflow would clip.
-            py: 0.5,
-            mx: { xs: -0.5, sm: 0 },
-            px: { xs: 0.5, sm: 0 },
-            scrollbarWidth: "none",
-            "&::-webkit-scrollbar": { display: "none" },
-            "& > *": { flexShrink: 0 },
-          }}
-        >
-          {tags.map((tag) => (
-            <Chip
-              key={tag.slug}
-              label={`${tag.name} (${tag.count})`}
-              onClick={() => toggleTag(tag.slug)}
-              color={activeTags.includes(tag.slug) ? "primary" : "default"}
-              variant={activeTags.includes(tag.slug) ? "filled" : "outlined"}
-              size="small"
-            />
-          ))}
-        </Box>
-      ) : null}
-    </Stack>
+      <Button
+        onClick={(e) => setSortAnchor(e.currentTarget)}
+        aria-haspopup="listbox"
+        sx={{
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          ml: { xs: "auto", sm: 0 },
+        }}
+      >
+        {sortLabel} ↓
+      </Button>
+      <Menu
+        anchorEl={sortAnchor}
+        open={Boolean(sortAnchor)}
+        onClose={() => setSortAnchor(null)}
+      >
+        {RECIPE_SORTS.map((option) => (
+          <MenuItem
+            key={option.value}
+            selected={option.value === sort}
+            onClick={() => setSort(option.value)}
+          >
+            {option.label}
+          </MenuItem>
+        ))}
+      </Menu>
+    </Box>
   );
 }

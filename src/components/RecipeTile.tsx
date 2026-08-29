@@ -42,11 +42,7 @@ export function RecipeTile({
           sizes="(max-width: 600px) 45vw, (max-width: 900px) 30vw, (max-width: 1200px) 15vw, 165px"
         />
       ) : (
-        <RecipePlaceholder
-          seed={recipe.id}
-          title={recipe.title}
-          height={height}
-        />
+        <RecipePlaceholder title={recipe.title} height={height} />
       )}
 
       <Typography
