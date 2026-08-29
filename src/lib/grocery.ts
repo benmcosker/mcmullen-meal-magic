@@ -170,12 +170,21 @@ export type PlannedMealWithRecipe = Awaited<
  */
 export const PLANNED_SLOT = "DINNER" as const;
 
+/**
+ * The slots that make up an evening, and so the shopping.
+ *
+ * A side is a second row on the same date, which is why the unique constraint
+ * on (household, date, slot) never had to change. Both are fetched here, or a
+ * side would be planned and then quietly missing from the list you shop from.
+ */
+export const SHOPPING_SLOTS = ["DINNER", "SIDE"] as const;
+
 export async function getWeekPlan(weekStart: Date, householdId: string) {
   return prisma.plannedMeal.findMany({
     where: {
       householdId,
       date: { gte: weekStart, lt: addDays(weekStart, 7) },
-      slot: PLANNED_SLOT,
+      slot: { in: [...SHOPPING_SLOTS] },
     },
     include: {
       recipe: {

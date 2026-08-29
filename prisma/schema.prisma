@@ -356,6 +356,13 @@ enum MealSlot {
   BREAKFAST
   LUNCH
   DINNER
+  /// Something alongside the dinner, rather than a meal of its own.
+  ///
+  /// A slot rather than a flag on the meal, because the unique constraint is
+  /// on (household, date, slot) - so a side and a dinner on the same evening
+  /// are already legal without touching it, and a side's ingredients reach the
+  /// shopping list through the same path everything else uses.
+  SIDE
   SNACK
 }
 
