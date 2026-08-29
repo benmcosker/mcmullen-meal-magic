@@ -144,7 +144,6 @@ export default async function RecipePage({
           />
         ) : (
           <RecipePlaceholder
-            seed={recipe.id}
             title={recipe.title}
             height={{ xs: 160, sm: 220 }}
             showTitle

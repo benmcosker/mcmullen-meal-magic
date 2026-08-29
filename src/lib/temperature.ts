@@ -34,3 +34,19 @@ export function formatMinutes(
   const rest = minutes % 60;
   return rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`;
 }
+
+/**
+ * Just the dial setting: "475°F".
+ *
+ * `formatOvenTemp` carries the conversion, which is what you want when you are
+ * standing at the oven. In a metadata row beside the servings and the total
+ * time it is three times the length of everything around it, so this is the
+ * same number without the parenthetical.
+ */
+export function formatOvenTempShort(
+  temp: number | null | undefined,
+  unit: TemperatureUnit | null | undefined,
+): string | null {
+  if (temp == null || !unit) return null;
+  return `${temp}°${unit === "FAHRENHEIT" ? "F" : "C"}`;
+}

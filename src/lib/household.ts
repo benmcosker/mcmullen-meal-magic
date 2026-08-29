@@ -112,3 +112,17 @@ export async function saveOwnPhone(
   });
   return { ok: true, phone: parsed.e164 };
 }
+
+/**
+ * A household's name with a definite article, without doubling one it already
+ * has.
+ *
+ * People name their household both ways - "McMullens" and "The McMullens" are
+ * both what a family calls itself - and the recipes page wants to say "The
+ * McMullens recipe box" either way rather than "The The McMullens recipe box".
+ */
+export function withArticle(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  return /^the\s/i.test(trimmed) ? trimmed : `The ${trimmed}`;
+}
