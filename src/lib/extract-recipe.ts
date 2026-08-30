@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
+import type { SupportedImageType } from "./image-inspect";
 import { OVEN_TEMP_RANGE, type ExtractedRecipe } from "./recipe-schema";
 
 /**
@@ -111,20 +112,40 @@ const extractionSchema = z.object({
     ),
 });
 
-const SYSTEM_PROMPT = `You extract recipes from PDFs into structured data for a family recipe library.
+const SYSTEM_PROMPT = `You extract recipes from recipe cards into structured data for a family recipe library. A card arrives either as a PDF or as a photograph of a printed or handwritten one.
 
 Rules:
-- Transcribe what the document says. Do not invent quantities, times or steps that are not present.
+- Transcribe what the card says. Do not invent quantities, times or steps that are not present.
+- A photograph may be skewed, shadowed or partly glared. Read what is legible and leave the rest null rather than guessing at a blurred number - a missing cook time is a small gap, an invented one is wrong every time somebody cooks from it.
 - If a field is genuinely absent, return null rather than guessing.
 - Split combined ingredient lines into separate entries.
 - Convert fractions and ranges to a single number: "1/2" becomes 0.5, "2-3" becomes 2.
 - Keep instruction steps in their original order, one step per array entry.
 - Oven temperature is often printed only inside a step ("bake at 375F for 20 minutes"). Read the steps for it, not just the header block.
 - Give the temperature in the unit the card printed. Do not convert between Fahrenheit and Celsius.
-- If the document is not a recipe, still return your best reading and set confidence to "low".`;
+- If the card is not a recipe, or too little of it can be read, still return your best reading and set confidence to "low".`;
 
 export type ExtractionResult =
   { ok: true; recipe: ExtractedRecipe } | { ok: false; error: string };
+
+/**
+ * The formats the API will read as an image. Deliberately the same four
+ * `inspectImage` recognises, which is not a coincidence worth relying on
+ * silently: if either list moves, a file that passes inspection would be
+ * rejected by the API with a much worse error.
+ */
+export type CardImageType =
+  "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+/**
+ * The most a photograph of a card may weigh.
+ *
+ * The API's per-image ceiling is 10 MB of base64, and base64 inflates bytes by
+ * about a third - so the real limit on what comes off a camera is nearer 7 MB.
+ * Checking raw bytes here means the refusal arrives before the upload is
+ * encoded and sent, rather than as a 400 from the API afterwards.
+ */
+export const MAX_CARD_IMAGE_BYTES = 7 * 1024 * 1024;
 
 /**
  * Read a recipe out of a PDF.
@@ -137,11 +158,61 @@ export async function extractRecipeFromPdf(
   pdfBytes: Uint8Array,
   filename: string,
 ): Promise<ExtractionResult> {
+  return extract([
+    {
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: Buffer.from(pdfBytes).toString("base64"),
+      },
+    },
+    {
+      type: "text",
+      text: `Extract the recipe from this PDF (filename: ${filename}).`,
+    },
+  ]);
+}
+
+/**
+ * Read a recipe out of a photograph of a card.
+ *
+ * The image block comes before the instruction because Claude reads
+ * image-then-text better than the other way round, which is the same ordering
+ * the PDF path already uses.
+ */
+export async function extractRecipeFromImage(
+  imageBytes: Uint8Array,
+  mediaType: SupportedImageType,
+  filename: string,
+): Promise<ExtractionResult> {
+  return extract([
+    {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: mediaType,
+        data: Buffer.from(imageBytes).toString("base64"),
+      },
+    },
+    {
+      type: "text",
+      text:
+        `Extract the recipe from this photograph of a recipe card ` +
+        `(filename: ${filename}).`,
+    },
+  ]);
+}
+
+/** Everything the two entry points share: one call, one schema, one parse. */
+async function extract(
+  content: Anthropic.ContentBlockParam[],
+): Promise<ExtractionResult> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return {
       ok: false,
       error:
-        "ANTHROPIC_API_KEY is not set, so PDF extraction is unavailable. " +
+        "ANTHROPIC_API_KEY is not set, so reading a card is unavailable. " +
         "Add a key, or enter the recipe by hand.",
     };
   }
@@ -154,25 +225,7 @@ export async function extractRecipeFromPdf(
       max_tokens: 16000,
       thinking: { type: "adaptive" },
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: Buffer.from(pdfBytes).toString("base64"),
-              },
-            },
-            {
-              type: "text",
-              text: `Extract the recipe from this PDF (filename: ${filename}).`,
-            },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content }],
       output_config: { format: zodOutputFormat(extractionSchema) },
     });
 
@@ -188,7 +241,7 @@ export async function extractRecipeFromPdf(
       return {
         ok: false,
         error:
-          "Could not read a recipe out of that PDF. Try entering it by hand.",
+          "Could not read a recipe off that card. Try entering it by hand.",
       };
     }
 

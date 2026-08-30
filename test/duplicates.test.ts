@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db";
 import {
-  findRecipeByPdfHash,
+  findRecipeBySourceHash,
   findSimilarlyTitled,
   hashBytes,
 } from "@/lib/duplicates";
@@ -43,7 +43,7 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
     await prisma.$disconnect();
   });
 
-  const add = (title: string, pdfSha256?: string) =>
+  const add = (title: string, sourceFileSha256?: string) =>
     createRecipe(
       recipeInput.parse({
         title,
@@ -53,7 +53,7 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
       }),
       householdId,
       userId,
-      pdfSha256 ? { source: "PDF", pdfSha256 } : {},
+      sourceFileSha256 ? { source: "PDF", sourceFileSha256 } : {},
     );
 
   describe("by file hash", () => {
@@ -61,14 +61,14 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
       const hash = hashBytes(bytes("the pdf"));
       await add("Chicken Piccata", hash);
 
-      const found = await findRecipeByPdfHash(hash);
+      const found = await findRecipeBySourceHash(hash);
       expect(found?.title).toBe("Chicken Piccata");
     });
 
     it("does not match a different file", async () => {
       await add("Chicken Piccata", hashBytes(bytes("the pdf")));
       expect(
-        await findRecipeByPdfHash(hashBytes(bytes("other pdf"))),
+        await findRecipeBySourceHash(hashBytes(bytes("other pdf"))),
       ).toBeNull();
     });
 

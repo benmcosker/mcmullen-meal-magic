@@ -2,11 +2,16 @@ import { BlobError } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
 import {
-  findRecipeByPdfHash,
+  findRecipeBySourceHash,
   findSimilarlyTitled,
   hashBytes,
 } from "@/lib/duplicates";
-import { extractRecipeFromPdf } from "@/lib/extract-recipe";
+import {
+  extractRecipeFromImage,
+  extractRecipeFromPdf,
+  MAX_CARD_IMAGE_BYTES,
+} from "@/lib/extract-recipe";
+import { inspectImage, type SupportedImageType } from "@/lib/image-inspect";
 import { extractLargestJpeg } from "@/lib/pdf-images";
 import { inspectPdf } from "@/lib/pdf-inspect";
 import { blobStoreId, storeFile } from "@/lib/storage";
@@ -25,6 +30,16 @@ export const maxDuration = 60;
 
 /** PDFs above this are refused outright; the API caps requests at 32 MB. */
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
+
+/** The first bytes of every PDF, used only to pick which validator applies. */
+const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
+
+function looksLikePdf(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= PDF_MAGIC.length &&
+    PDF_MAGIC.every((byte, i) => bytes[i] === byte)
+  );
+}
 
 /**
  * Anything that gets past the checks below and still throws.
@@ -55,14 +70,14 @@ export async function POST(request: Request) {
         {
           error:
             "File storage rejected the upload. The recipe was not saved - " +
-            "this is a configuration problem, not a problem with your PDF.",
+            "this is a configuration problem, not a problem with your file.",
         },
         { status: 500 },
       );
     }
 
     return NextResponse.json(
-      { error: "Something went wrong reading that PDF. Nothing was saved." },
+      { error: "Something went wrong reading that card. Nothing was saved." },
       { status: 500 },
     );
   }
@@ -94,34 +109,37 @@ async function handleUpload(request: Request) {
     return NextResponse.json({ error: "No file received." }, { status: 400 });
   }
 
-  // Size is checked before reading the body into memory.
+  // The largest thing either path accepts, checked before the body is read
+  // into memory. The per-format ceilings below are tighter.
   if (file.size > MAX_PDF_BYTES) {
     return NextResponse.json(
-      { error: "That PDF is larger than 20 MB." },
+      { error: "That file is larger than 20 MB." },
       { status: 413 },
     );
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
 
-  // Inspect the bytes rather than trusting file.type, which the browser
-  // supplies and anything else can forge. This also rejects damaged,
-  // encrypted and absurdly long PDFs before they cost a slow, billable model
-  // call that would fail anyway.
-  const inspection = await inspectPdf(bytes);
-  if (!inspection.ok) {
-    return NextResponse.json({ error: inspection.reason }, { status: 400 });
+  // Which validator applies is decided by the bytes, not by file.type - the
+  // browser supplies that and anything else can forge it. Everything below
+  // rejects damaged, encrypted, oversized and mislabelled files before they
+  // cost a slow, billable model call that would fail anyway.
+  const card = looksLikePdf(bytes)
+    ? await inspectAsPdf(bytes)
+    : inspectAsImage(bytes);
+  if (!card.ok) {
+    return NextResponse.json({ error: card.reason }, { status: card.status });
   }
 
   // Before extraction, not after: recognising a file we already have is the
   // difference between an instant answer and a slow, billable call whose
   // result gets thrown away.
-  const pdfSha256 = hashBytes(bytes);
-  const alreadyHave = await findRecipeByPdfHash(pdfSha256);
+  const sourceFileSha256 = hashBytes(bytes);
+  const alreadyHave = await findRecipeBySourceHash(sourceFileSha256);
   if (alreadyHave) {
     return NextResponse.json(
       {
-        error: `That exact PDF is already saved as "${alreadyHave.title}".`,
+        error: `That exact file is already saved as "${alreadyHave.title}".`,
         duplicateOf: alreadyHave,
       },
       { status: 409 },
@@ -129,34 +147,78 @@ async function handleUpload(request: Request) {
   }
 
   // Extraction is the slow part and the part that can fail, so do it before
-  // storing anything - a PDF we cannot read should not leave files behind.
-  const extraction = await extractRecipeFromPdf(bytes, file.name);
+  // storing anything - a card we cannot read should not leave files behind.
+  const extraction =
+    card.kind === "PDF"
+      ? await extractRecipeFromPdf(bytes, file.name)
+      : await extractRecipeFromImage(bytes, card.contentType, file.name);
   if (!extraction.ok) {
     return NextResponse.json({ error: extraction.error }, { status: 422 });
   }
 
-  const pdf = await storeFile(bytes, file.name, "application/pdf");
+  const stored = await storeFile(bytes, file.name, card.contentType);
 
-  // The dish photo is best-effort: plenty of recipe PDFs have no usable image,
-  // and that is not a reason to fail the upload.
+  // The dish photo, which is not the card.
+  //
+  // A PDF often carries a picture of the finished dish, and that is worth
+  // lifting out. A photograph of a card is a picture of the card - using it as
+  // the dish photo would put a snapshot of a piece of paper at the top of the
+  // recipe - so the photo path leaves this empty and the cook adds one later.
   let imageUrl: string | null = null;
-  const image = await extractLargestJpeg(bytes);
-  if (image) {
-    const stored = await storeFile(image.data, "photo.jpg", image.contentType);
-    imageUrl = stored.url;
+  if (card.kind === "PDF") {
+    const image = await extractLargestJpeg(bytes);
+    if (image) {
+      const photo = await storeFile(image.data, "photo.jpg", image.contentType);
+      imageUrl = photo.url;
+    }
   }
 
-  // A different PDF of a dish already in the library shares no bytes with it,
+  // A different file for a dish already in the library shares no bytes with it,
   // so only the title gives it away. Reported alongside the extraction as a
   // warning: the review screen can show it, and the person decides.
   const similar = await findSimilarlyTitled(extraction.recipe.title);
 
   return NextResponse.json({
     recipe: extraction.recipe,
-    pdfUrl: pdf.url,
-    pdfFilename: file.name,
-    pdfSha256,
+    source: card.kind,
+    sourceFileUrl: stored.url,
+    sourceFileName: file.name,
+    sourceFileType: card.contentType,
+    sourceFileSha256,
     imageUrl,
     similar,
   });
+}
+
+type CardCheck =
+  | { ok: true; kind: "PDF"; contentType: "application/pdf" }
+  | { ok: true; kind: "PHOTO"; contentType: SupportedImageType }
+  | { ok: false; reason: string; status: number };
+
+async function inspectAsPdf(bytes: Uint8Array): Promise<CardCheck> {
+  const inspection = await inspectPdf(bytes);
+  if (!inspection.ok) {
+    return { ok: false, reason: inspection.reason, status: 400 };
+  }
+  return { ok: true, kind: "PDF", contentType: "application/pdf" };
+}
+
+function inspectAsImage(bytes: Uint8Array): CardCheck {
+  // Ahead of the format check, because it is the more useful thing to say
+  // about a 12 MP photo: the file is fine, there is just too much of it.
+  if (bytes.length > MAX_CARD_IMAGE_BYTES) {
+    const mb = Math.round(MAX_CARD_IMAGE_BYTES / (1024 * 1024));
+    return {
+      ok: false,
+      status: 413,
+      reason: `That photo is larger than ${mb} MB. Most phones can send a smaller copy.`,
+    };
+  }
+
+  const inspection = inspectImage(bytes);
+  if (!inspection.ok) {
+    return { ok: false, reason: inspection.reason, status: 400 };
+  }
+
+  return { ok: true, kind: "PHOTO", contentType: inspection.contentType };
 }

@@ -1,5 +1,22 @@
+/**
+ * The image formats this app accepts, in one place.
+ *
+ * These are the formats a browser can reliably display *and* the formats the
+ * Claude API will read as an image - two constraints that happen to coincide
+ * on exactly this set. Anything added here has to satisfy both; see
+ * `test/image-inspect.test.ts`, which pins the list to what the API documents.
+ */
+export const SUPPORTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+] as const;
+
+export type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+
 export type ImageInspection =
-  | { ok: true; contentType: string; extension: string }
+  | { ok: true; contentType: SupportedImageType; extension: string }
   | { ok: false; reason: string };
 
 /**
@@ -21,7 +38,7 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
  */
 const SIGNATURES: {
   bytes: (number | null)[];
-  contentType: string;
+  contentType: SupportedImageType;
   extension: string;
 }[] = [
   { bytes: [0xff, 0xd8, 0xff], contentType: "image/jpeg", extension: "jpg" },
