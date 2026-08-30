@@ -104,7 +104,11 @@ export function WeekPlanner({
   pantry: PantryItemRecord[];
   providers: ProviderInfo[];
   /** Null when texting is not configured on this deployment. */
-  smsAudience: { names: string[]; withoutNumbers: string[] } | null;
+  smsAudience: {
+    names: string[];
+    withoutNumbers: string[];
+    withoutConsent: string[];
+  } | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -458,10 +462,18 @@ export function WeekPlanner({
               sx={{ display: "block", mb: 1.5 }}
             >
               {smsAudience.names.length === 0
-                ? "Nobody has a phone number saved yet — add one on the household page."
+                ? "Nobody has agreed to be texted yet — add a number and tick the box on the household page."
                 : `Texts ${smsAudience.names.join(" and ")}.`}
               {smsAudience.withoutNumbers.length > 0
                 ? ` ${smsAudience.withoutNumbers.join(" and ")} has no number saved.`
+                : ""}
+              {/*
+               * Said separately from the missing numbers: this person has
+               * typed theirs, and telling them to add it again is the one
+               * instruction that will not help.
+               */}
+              {smsAudience.withoutConsent.length > 0
+                ? ` ${smsAudience.withoutConsent.join(" and ")} has not agreed to be texted.`
                 : ""}
             </Typography>
           ) : null}

@@ -138,11 +138,15 @@ export async function textShoppingListAction(
   const failed = result.failed.length
     ? ` Could not reach ${formatNames(result.failed.map((f) => f.name))}: ${result.failed[0].error}`
     : "";
-  const skipped = result.skipped.length
-    ? ` ${formatNames(result.skipped)} ${result.skipped.length === 1 ? "has" : "have"} no number saved.`
+  // Named apart, because the two gaps need different things doing about them.
+  const noNumber = result.withoutNumber.length
+    ? ` ${formatNames(result.withoutNumber)} ${result.withoutNumber.length === 1 ? "has" : "have"} no number saved.`
+    : "";
+  const noConsent = result.withoutConsent.length
+    ? ` ${formatNames(result.withoutConsent)} ${result.withoutConsent.length === 1 ? "has" : "have"} not agreed to be texted.`
     : "";
 
-  return { ok: true, message: `${sent}${failed}${skipped}` };
+  return { ok: true, message: `${sent}${failed}${noNumber}${noConsent}` };
 }
 
 /** "Ben", "Ben and Laura", "Ben, Laura and Pat". */

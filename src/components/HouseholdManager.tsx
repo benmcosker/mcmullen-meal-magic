@@ -24,11 +24,14 @@ import {
 } from "@/app/household/actions";
 import { formatPhone } from "@/lib/phone";
 
+import { SmsConsentCheckbox, SmsDisclosure } from "./SmsDisclosure";
+
 export type MemberView = {
   id: string;
   name: string;
   email: string;
   phone: string | null;
+  smsConsented: boolean;
 };
 export type InviteView = {
   id: string;
@@ -67,6 +70,7 @@ export function HouseholdManager({
   inviteDays,
   maxNameLength,
   myPhone,
+  myConsent,
   smsConfigured,
 }: {
   householdName: string;
@@ -75,12 +79,17 @@ export function HouseholdManager({
   inviteDays: number;
   maxNameLength: number;
   myPhone: string | null;
+  myConsent: boolean;
   smsConfigured: boolean;
 }) {
   return (
     <Stack spacing={3}>
       <HouseholdName current={householdName} maxLength={maxNameLength} />
-      <MyPhone current={myPhone} smsConfigured={smsConfigured} />
+      <MyPhone
+        current={myPhone}
+        consented={myConsent}
+        smsConfigured={smsConfigured}
+      />
       <Members members={members} householdName={householdName} />
       <InviteForm inviteDays={inviteDays} maxNameLength={maxNameLength} />
       {invites.length > 0 ? <PendingInvites invites={invites} /> : null}
@@ -153,12 +162,18 @@ function HouseholdName({
  */
 function MyPhone({
   current,
+  consented,
   smsConfigured,
 }: {
   current: string | null;
+  consented: boolean;
   smsConfigured: boolean;
 }) {
   const [draft, setDraft] = useState(current ? formatPhone(current) : "");
+  // Seeded from what is stored rather than from whether a number exists: the
+  // two really are separate, and somebody who unticked the box last week
+  // should not find it ticked again today.
+  const [consent, setConsent] = useState(consented);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -169,13 +184,20 @@ function MyPhone({
     setSaved(null);
 
     startTransition(async () => {
-      const result = await saveMyPhoneAction(draft);
+      const result = await saveMyPhoneAction(draft, consent);
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setDraft(result.phone ? formatPhone(result.phone) : "");
-      setSaved(result.phone ? "Saved." : "Removed.");
+      setConsent(result.consented);
+      setSaved(
+        !result.phone
+          ? "Removed."
+          : result.consented
+            ? "Saved. You will get the week's list by text."
+            : "Saved. You will not be texted until you tick the box.",
+      );
     });
   }
 
@@ -206,6 +228,22 @@ function MyPhone({
             Save
           </Button>
         </Stack>
+
+        {/*
+         * The agreement, and everything a carrier requires be shown next to it.
+         * Kept under the field rather than behind a link: consent given without
+         * the frequency and the cost in front of you is not really given.
+         */}
+        <Box sx={{ mt: 2 }}>
+          <SmsConsentCheckbox
+            checked={consent}
+            onChange={setConsent}
+            disabled={pending}
+          />
+          <Box sx={{ mt: 1 }}>
+            <SmsDisclosure />
+          </Box>
+        </Box>
 
         {error ? (
           <Alert severity="error" sx={{ mt: 2 }}>
@@ -249,9 +287,17 @@ function Members({
                 {member.email}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {member.phone
-                  ? formatPhone(member.phone)
-                  : "No number — will not get the shopping text"}
+                {/*
+                 * Three states, not two. Somebody with a number who never
+                 * ticked the box gets nothing, and showing their number bare -
+                 * exactly as it looks for a member who does get the text -
+                 * would say the opposite.
+                 */}
+                {!member.phone
+                  ? "No number — will not get the shopping text"
+                  : member.smsConsented
+                    ? formatPhone(member.phone)
+                    : `${formatPhone(member.phone)} — has not agreed to be texted`}
               </Typography>
             </Box>
           ))}
