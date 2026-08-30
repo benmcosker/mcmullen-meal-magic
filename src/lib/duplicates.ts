@@ -13,14 +13,16 @@ export function hashBytes(bytes: Uint8Array): string {
  * Has this exact file been uploaded before?
  *
  * Checked before extraction rather than after, which is the whole point: a
- * second upload of the same PDF costs nothing instead of a slow, billable model
- * call whose result is thrown away.
+ * second upload of the same file costs nothing instead of a slow, billable
+ * model call whose result is thrown away. A photograph only matches a
+ * byte-identical photograph - two shots of the same card differ in every
+ * pixel - so this catches re-uploading a file, not re-photographing a card.
  */
-export async function findRecipeByPdfHash(
-  pdfSha256: string,
+export async function findRecipeBySourceHash(
+  sourceFileSha256: string,
 ): Promise<ExistingRecipe | null> {
   return prisma.recipe.findUnique({
-    where: { pdfSha256 },
+    where: { sourceFileSha256 },
     select: { id: true, title: true },
   });
 }

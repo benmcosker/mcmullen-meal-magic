@@ -8,12 +8,14 @@ function emptyToNull(value: string | null | undefined): string | null {
 }
 
 type RecipeAssets = {
-  pdfUrl?: string | null;
-  pdfFilename?: string | null;
+  sourceFileUrl?: string | null;
+  sourceFileName?: string | null;
+  /** The stored file's content type, so a page can link it or show it. */
+  sourceFileType?: string | null;
   /** Lets a re-upload of the same file be recognised. Null for manual entry. */
-  pdfSha256?: string | null;
+  sourceFileSha256?: string | null;
   imageUrl?: string | null;
-  source?: "MANUAL" | "PDF";
+  source?: "MANUAL" | "PDF" | "PHOTO";
 };
 
 export async function createRecipe(
@@ -41,9 +43,10 @@ export async function createRecipe(
       notes: emptyToNull(input.notes),
       instructions: input.instructions,
       source: assets.source ?? "MANUAL",
-      pdfUrl: assets.pdfUrl ?? null,
-      pdfFilename: assets.pdfFilename ?? null,
-      pdfSha256: assets.pdfSha256 ?? null,
+      sourceFileUrl: assets.sourceFileUrl ?? null,
+      sourceFileName: assets.sourceFileName ?? null,
+      sourceFileType: assets.sourceFileType ?? null,
+      sourceFileSha256: assets.sourceFileSha256 ?? null,
       imageUrl: assets.imageUrl ?? null,
       householdId,
       createdById,

@@ -28,9 +28,11 @@ type ExistingRecipe = { id: string; title: string };
 
 type Extracted = {
   recipe: ExtractedRecipe;
-  pdfUrl: string | null;
-  pdfFilename: string | null;
-  pdfSha256: string | null;
+  source: "PDF" | "PHOTO";
+  sourceFileUrl: string | null;
+  sourceFileName: string | null;
+  sourceFileType: string | null;
+  sourceFileSha256: string | null;
   imageUrl: string | null;
   /** Recipes already in the library whose titles look like this one. */
   similar: ExistingRecipe[];
@@ -50,7 +52,7 @@ export function UploadWorkflow() {
   const [extracted, setExtracted] = useState<Extracted | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<ExistingRecipe | null>(null);
 
-  // Reading a PDF takes tens of seconds. Without a counter there is no way to
+  // Reading a card takes tens of seconds. Without a counter there is no way to
   // tell a slow extraction from a wedged one, and people re-submit.
   useEffect(() => {
     if (!busy) return;
@@ -106,7 +108,7 @@ export function UploadWorkflow() {
     } catch (cause) {
       setError(
         cause instanceof DOMException && cause.name === "AbortError"
-          ? "That PDF took too long to read. Try a shorter one, or add the recipe by hand."
+          ? "That card took too long to read. Try a shorter or smaller one, or add the recipe by hand."
           : "Upload failed. Check your connection and try again.",
       );
     } finally {
@@ -166,7 +168,9 @@ export function UploadWorkflow() {
           />
         ) : (
           <Typography variant="body2" color="text.secondary">
-            No usable photo was found in the PDF.
+            {extracted.source === "PHOTO"
+              ? "A photo of the card is not a photo of the dish, so none was set. You can add one after saving."
+              : "No usable photo was found in the PDF."}
           </Typography>
         )}
 
@@ -184,14 +188,14 @@ export function UploadWorkflow() {
             disabled={busy}
             onClick={async () => {
               setBusy(true);
-              // Remove the stored PDF and photo: nothing will reference them
+              // Remove the stored card and photo: nothing will reference them
               // once this draft is gone.
               await discardUploadAction(assets);
               setExtracted(null);
               setBusy(false);
             }}
           >
-            Discard and upload a different PDF
+            Discard and upload a different card
           </Button>
         </Box>
       </Stack>
@@ -207,7 +211,7 @@ export function UploadWorkflow() {
             <>
               {" "}
               <Link href={`/recipes/${duplicateOf.id}`}>Open it</Link>, or pick
-              a different PDF.
+              a different file.
             </>
           ) : null}
         </Alert>
@@ -217,7 +221,7 @@ export function UploadWorkflow() {
         <CardContent>
           <Stack spacing={2} sx={{ alignItems: "center", py: 4 }}>
             <UploadFileIcon fontSize="large" color="disabled" />
-            <Typography variant="h3">Choose a recipe PDF</Typography>
+            <Typography variant="h3">Choose a recipe card</Typography>
             <Typography variant="body2" color="text.secondary" align="center">
               Up to 20 MB. Reading it takes a few seconds.
             </Typography>
@@ -225,7 +229,7 @@ export function UploadWorkflow() {
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,image/jpeg,image/png,image/gif,image/webp"
               hidden
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -243,9 +247,9 @@ export function UploadWorkflow() {
             >
               {busy
                 ? elapsed > 0
-                  ? `Reading the PDF… ${elapsed}s`
-                  : "Reading the PDF…"
-                : "Select PDF"}
+                  ? `Reading the card… ${elapsed}s`
+                  : "Reading the card…"
+                : "Select a PDF or photo"}
             </Button>
 
             {busy ? <LinearProgress sx={{ width: "100%" }} /> : null}

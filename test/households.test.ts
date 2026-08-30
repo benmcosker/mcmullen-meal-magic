@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db";
-import { findRecipeByPdfHash, findSimilarlyTitled } from "@/lib/duplicates";
+import { findRecipeBySourceHash, findSimilarlyTitled } from "@/lib/duplicates";
 import { getWeeklySkips, getWeekPlan, weekStartOf } from "@/lib/grocery";
 import { defaultHouseholdName, getHousehold } from "@/lib/household";
 import { createInvite, redeemInvite } from "@/lib/invites";
@@ -108,12 +108,14 @@ describe.skipIf(!hasDb)("two households", () => {
     it("recognises a card somebody else already uploaded", async () => {
       // Shared library, so a duplicate is a duplicate for everyone: there is
       // no point in a second copy of a recipe already sitting there.
-      const pdfSha256 = "a".repeat(64);
-      await add(theirs, "Piccata", { source: "PDF", pdfSha256 });
+      const sourceFileSha256 = "a".repeat(64);
+      await add(theirs, "Piccata", { source: "PDF", sourceFileSha256 });
 
-      expect((await findRecipeByPdfHash(pdfSha256))?.title).toBe("Piccata");
+      expect((await findRecipeBySourceHash(sourceFileSha256))?.title).toBe(
+        "Piccata",
+      );
       await expect(
-        add(ours, "Piccata", { source: "PDF", pdfSha256 }),
+        add(ours, "Piccata", { source: "PDF", sourceFileSha256 }),
       ).rejects.toThrow();
     });
 

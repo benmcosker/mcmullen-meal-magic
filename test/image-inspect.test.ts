@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_IMAGE_BYTES, inspectImage } from "@/lib/image-inspect";
+import {
+  MAX_IMAGE_BYTES,
+  SUPPORTED_IMAGE_TYPES,
+  inspectImage,
+} from "@/lib/image-inspect";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -80,5 +84,31 @@ describe("inspectImage", () => {
     // Two of PNG's eight magic bytes. Comparing only what happens to be
     // present would let this through and store an unopenable file.
     expect(inspectImage(bytes(0x89, 0x50)).ok).toBe(false);
+  });
+});
+
+describe("SUPPORTED_IMAGE_TYPES", () => {
+  it("is exactly what the Claude API will read as an image", () => {
+    // Card photographs go to the model as image blocks, and the API reads
+    // JPEG, PNG, GIF and WebP - nothing else. This list also gates what the
+    // browser is asked to display, and the two constraints only happen to
+    // coincide. Adding a format a browser shows but the API cannot read (AVIF,
+    // say) would pass inspection and then fail at extraction with a 400, so
+    // this test is here to make that a red suite rather than a bad afternoon.
+    expect([...SUPPORTED_IMAGE_TYPES].sort()).toEqual([
+      "image/gif",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ]);
+  });
+
+  it("recognises every format it claims to support", () => {
+    const recognised = [JPEG, PNG, GIF, WEBP].map((sample) => {
+      const inspection = inspectImage(sample);
+      return inspection.ok ? inspection.contentType : null;
+    });
+
+    expect(recognised.sort()).toEqual([...SUPPORTED_IMAGE_TYPES].sort());
   });
 });

@@ -19,9 +19,11 @@ export type SaveExtractedResult = { ok: false; error: string };
 export async function saveExtractedRecipeAction(
   raw: unknown,
   assets: {
-    pdfUrl?: string | null;
-    pdfFilename?: string | null;
-    pdfSha256?: string | null;
+    source?: "PDF" | "PHOTO";
+    sourceFileUrl?: string | null;
+    sourceFileName?: string | null;
+    sourceFileType?: string | null;
+    sourceFileSha256?: string | null;
     imageUrl?: string | null;
   },
 ): Promise<SaveExtractedResult> {
@@ -36,10 +38,11 @@ export async function saveExtractedRecipeAction(
   }
 
   const id = await createRecipe(parsed.data, user.householdId, user.id, {
-    source: "PDF",
-    pdfUrl: assets.pdfUrl ?? null,
-    pdfFilename: assets.pdfFilename ?? null,
-    pdfSha256: assets.pdfSha256 ?? null,
+    source: assets.source ?? "PDF",
+    sourceFileUrl: assets.sourceFileUrl ?? null,
+    sourceFileName: assets.sourceFileName ?? null,
+    sourceFileType: assets.sourceFileType ?? null,
+    sourceFileSha256: assets.sourceFileSha256 ?? null,
     imageUrl: assets.imageUrl ?? null,
   });
 
@@ -50,19 +53,19 @@ export async function saveExtractedRecipeAction(
 /**
  * Throw away files stored for an extraction the uploader decided against.
  *
- * The PDF and photo are stored before the review screen so it has something to
- * show. If the draft is discarded, nothing will ever reference them again, so
+ * The card and any dish photo are stored before the review screen so it has
+ * something to show. If the draft is discarded, nothing will ever reference them again, so
  * they are removed here rather than left to accumulate silently in the blob
  * store.
  */
 export async function discardUploadAction(assets: {
-  pdfUrl?: string | null;
+  sourceFileUrl?: string | null;
   imageUrl?: string | null;
 }): Promise<void> {
   await requireUser();
 
   await Promise.all([
-    assets.pdfUrl ? deleteFile(assets.pdfUrl) : Promise.resolve(),
+    assets.sourceFileUrl ? deleteFile(assets.sourceFileUrl) : Promise.resolve(),
     assets.imageUrl ? deleteFile(assets.imageUrl) : Promise.resolve(),
   ]);
 }

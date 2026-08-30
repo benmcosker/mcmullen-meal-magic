@@ -2,6 +2,7 @@
 
 import KitchenIcon from "@mui/icons-material/Kitchen";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Chip, { type ChipProps } from "@mui/material/Chip";
 
@@ -23,6 +24,7 @@ const icons = {
   oven: LocalFireDepartmentIcon,
   equipment: KitchenIcon,
   pdf: PictureAsPdfIcon,
+  photo: PhotoCameraIcon,
 } as const;
 
 export type ChipIconName = keyof typeof icons;

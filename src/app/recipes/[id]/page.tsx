@@ -116,15 +116,15 @@ export default async function RecipePage({
         {recipe.tags.map(({ tag }) => (
           <Chip key={tag.id} label={tag.name} size="small" variant="outlined" />
         ))}
-        {recipe.pdfUrl ? (
+        {recipe.sourceFileUrl ? (
           <IconChip
-            icon="pdf"
+            icon={recipe.sourceFileType === "application/pdf" ? "pdf" : "photo"}
             component="a"
-            href={recipe.pdfUrl}
+            href={recipe.sourceFileUrl}
             target="_blank"
             rel="noopener noreferrer"
             clickable
-            label={recipe.pdfFilename ?? "Original PDF"}
+            label={recipe.sourceFileName ?? "Original card"}
             size="small"
             variant="outlined"
           />

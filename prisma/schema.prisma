@@ -187,6 +187,8 @@ enum TemperatureUnit {
 enum RecipeSource {
   MANUAL
   PDF
+  /// A photograph of a recipe card, rather than a PDF of one.
+  PHOTO
 }
 
 model Recipe {
@@ -221,19 +223,28 @@ model Recipe {
   /// rather than at step four.
   equipment    String[]         @default([])
 
-  /// Blob URLs. Both optional: the dish photo especially is best-effort, since
-  /// not every PDF contains one.
-  pdfUrl      String?
-  pdfFilename String?
-  /// SHA-256 of the uploaded PDF's bytes, so the same file is recognised on a
-  /// second upload. Unique, and null for recipes typed in by hand - Postgres
-  /// treats NULLs as distinct, so any number of manual recipes coexist while
-  /// one PDF can only ever produce one recipe.
+  /// The card this recipe was read from: a PDF, or a photograph of one.
+  ///
+  /// Named for what it is rather than what it was - these were `pdfUrl` and
+  /// friends until the upload learned to accept photographs, and a JPEG stored
+  /// in a column called `pdfUrl` is the kind of thing that reads as a bug for
+  /// years afterwards.
+  sourceFileUrl    String?
+  sourceFileName   String?
+  /// The content type, so a page can tell whether to link the file or show it.
+  /// A PDF gets a link; a photograph of a card can be displayed.
+  sourceFileType   String?
+  /// SHA-256 of the uploaded file's bytes, so the same file is recognised on a
+  /// second upload. Null for recipes typed in by hand - Postgres treats NULLs
+  /// as distinct, so any number of manual recipes coexist while one file can
+  /// only ever produce one recipe.
   /// Unique across the whole library, because the library is shared: if
   /// somebody has already uploaded this exact card, the recipe is there for
   /// everyone and a second copy is noise rather than a second dish.
-  pdfSha256   String? @unique
-  imageUrl    String?
+  sourceFileSha256 String? @unique
+  /// The dish, not the card. Best-effort: lifted out of a PDF when there is a
+  /// usable picture in it, and otherwise added by hand later.
+  imageUrl         String?
 
   /// Which family added this, not who is allowed to read it.
   ///
