@@ -1,3 +1,5 @@
+import { SmsConsentSource } from "@/generated/prisma/enums";
+
 import { prisma } from "./db";
 import { parsePhone } from "./phone";
 
@@ -24,6 +26,8 @@ export type HouseholdMember = {
   email: string;
   /** E.164, or null. Whether the week's shopping can reach them. */
   phone: string | null;
+  /** Whether they have agreed to be texted. A number alone is not consent. */
+  smsConsented: boolean;
   joinedAt: Date;
 };
 
@@ -45,6 +49,7 @@ export async function getHousehold(
           name: true,
           email: true,
           phone: true,
+          smsConsentAt: true,
           createdAt: true,
         },
         orderBy: { createdAt: "asc" },
@@ -61,6 +66,7 @@ export async function getHousehold(
       name: member.name,
       email: member.email,
       phone: member.phone,
+      smsConsented: member.smsConsentAt !== null,
       joinedAt: member.createdAt,
     })),
   };
@@ -84,33 +90,64 @@ export async function renameHousehold(
 }
 
 export type SavePhoneResult =
-  { ok: true; phone: string | null } | { ok: false; error: string };
+  | { ok: true; phone: string | null; consented: boolean }
+  | { ok: false; error: string };
 
 /**
- * Set or clear your own number.
+ * Set or clear your own number, and say whether you agree to be texted.
  *
  * Only ever your own: a phone number is the one thing here that reaches a
  * person outside the app, and somebody else in the household typing it wrongly
  * sends the week's shopping to a stranger. Blank clears it, which is how
  * somebody stops receiving the texts without leaving the household.
+ *
+ * The number and the agreement are stored as two facts rather than one. A
+ * number on file is not consent - it is only an address - and US carriers
+ * require the agreement itself to be recorded and producible. Keeping them
+ * apart also gives people the milder option: untick the box and the texts stop
+ * while the number stays, instead of having to delete it and type it again
+ * later.
  */
 export async function saveOwnPhone(
   userId: string,
   input: string,
+  consent: boolean,
 ): Promise<SavePhoneResult> {
   if (!input.trim()) {
-    await prisma.user.update({ where: { id: userId }, data: { phone: null } });
-    return { ok: true, phone: null };
+    // Removing the number withdraws the agreement with it. Keeping a consent
+    // record for a number the app no longer holds would be a claim about
+    // somebody who has just told you to stop.
+    await prisma.user.update({
+      where: { id: userId },
+      data: { phone: null, smsConsentAt: null, smsConsentSource: null },
+    });
+    return { ok: true, phone: null, consented: false };
   }
 
   const parsed = parsePhone(input);
   if (!parsed.ok) return { ok: false, error: parsed.reason };
 
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { smsConsentAt: true },
+  });
+
+  // An unchanged tick keeps its original date: the fact worth recording is
+  // when this person first agreed, not the last time they pressed Save.
+  const consentData = consent
+    ? existing?.smsConsentAt
+      ? {}
+      : {
+          smsConsentAt: new Date(),
+          smsConsentSource: SmsConsentSource.CHECKBOX,
+        }
+    : { smsConsentAt: null, smsConsentSource: null };
+
   await prisma.user.update({
     where: { id: userId },
-    data: { phone: parsed.e164 },
+    data: { phone: parsed.e164, ...consentData },
   });
-  return { ok: true, phone: parsed.e164 };
+  return { ok: true, phone: parsed.e164, consented: consent };
 }
 
 /**

@@ -45,6 +45,13 @@ model User {
   /// a household sharing one handset is odd but not wrong, and a unique index
   /// would turn that into an error message nobody could act on.
   phone         String?
+  /// When this person agreed to be texted, or null if they never have.
+  ///
+  /// Separate from `phone` on purpose - see SmsConsentSource. Nulled alongside
+  /// the number when somebody clears it, so removing your number is also a
+  /// withdrawal rather than a number the app has merely misplaced.
+  smsConsentAt     DateTime?
+  smsConsentSource SmsConsentSource?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
@@ -182,6 +189,20 @@ model Invite {
 enum TemperatureUnit {
   FAHRENHEIT
   CELSIUS
+}
+
+/// Where a person's agreement to be texted came from.
+///
+/// Recorded rather than inferred from the presence of a number, because these
+/// are two different facts: a number is how to reach somebody, consent is
+/// whether they said you may. A carrier asking to see the opt-in wants the
+/// second one, and "they had given us their number" is not an answer to it.
+enum SmsConsentSource {
+  /// Ticked the box themselves, on signup or on the household page.
+  CHECKBOX
+  /// Carried over from before consent was recorded separately. Honest about
+  /// what it is: nobody ticked anything, the number simply predates the box.
+  IMPORTED
 }
 
 enum RecipeSource {

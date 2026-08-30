@@ -77,7 +77,8 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
           smsAvailable()
             ? {
                 names: audience.recipients.map((r) => r.name),
-                withoutNumbers: audience.skipped,
+                withoutNumbers: audience.withoutNumber,
+                withoutConsent: audience.withoutConsent,
               }
             : null
         }

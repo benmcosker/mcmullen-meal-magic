@@ -20,26 +20,49 @@ export type TextListResult =
       /** Named individually: a partial failure is not a failure. */
       failed: { name: string; error: string }[];
       /** Members with no number on file, so the gap is visible. */
-      skipped: string[];
+      withoutNumber: string[];
+      /** Members who have a number but have not agreed to be texted. */
+      withoutConsent: string[];
     }
   | { ok: false; error: string };
 
-/** Everyone in the household who could be texted, and everyone who could not. */
+/**
+ * Everyone in the household who may be texted, and everyone who may not.
+ *
+ * A number is not permission. Somebody can have one on file and still not have
+ * agreed to receive texts - they never ticked the box, or they unticked it -
+ * and sending to them anyway is both a broken promise and the thing US
+ * carriers register campaigns to prevent.
+ *
+ * The two ways of being left out are reported apart because they need
+ * different things from the person: one has to add a number, the other has to
+ * agree. Telling somebody who has typed their number that they have no number
+ * saved sends them to type it again.
+ */
 export async function shoppingListAudience(householdId: string): Promise<{
   recipients: SmsRecipient[];
-  skipped: string[];
+  /** In the household, but there is nowhere to send it. */
+  withoutNumber: string[];
+  /** Reachable, but has not agreed to be. */
+  withoutConsent: string[];
 }> {
   const members = await prisma.user.findMany({
     where: { householdId },
-    select: { name: true, phone: true },
+    select: { name: true, phone: true, smsConsentAt: true },
     orderBy: { createdAt: "asc" },
   });
 
   return {
     recipients: members
-      .filter((m): m is { name: string; phone: string } => Boolean(m.phone))
+      .filter(
+        (m): m is { name: string; phone: string; smsConsentAt: Date } =>
+          Boolean(m.phone) && m.smsConsentAt !== null,
+      )
       .map((m) => ({ name: m.name, phone: m.phone })),
-    skipped: members.filter((m) => !m.phone).map((m) => m.name),
+    withoutNumber: members.filter((m) => !m.phone).map((m) => m.name),
+    withoutConsent: members
+      .filter((m) => m.phone && m.smsConsentAt === null)
+      .map((m) => m.name),
   };
 }
 
@@ -77,13 +100,14 @@ export async function textShoppingList(params: {
     };
   }
 
-  const { recipients, skipped } = await shoppingListAudience(
-    params.householdId,
-  );
+  const { recipients, withoutNumber, withoutConsent } =
+    await shoppingListAudience(params.householdId);
   if (recipients.length === 0) {
     return {
       ok: false,
-      error: "Nobody in the household has a phone number yet.",
+      error: withoutConsent.length
+        ? "Nobody has agreed to be texted yet. Tick the box on the Household page to turn it on."
+        : "Nobody in the household has a phone number yet.",
     };
   }
 
@@ -127,5 +151,12 @@ export async function textShoppingList(params: {
     };
   }
 
-  return { ok: true, parts: parts.length, delivered, failed, skipped };
+  return {
+    ok: true,
+    parts: parts.length,
+    delivered,
+    failed,
+    withoutNumber,
+    withoutConsent,
+  };
 }

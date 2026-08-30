@@ -10,9 +10,12 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import { useState, type FormEvent } from "react";
 
 import { signIn, signUp } from "@/lib/auth-client";
+
+import { SmsConsentCheckbox, SmsDisclosure } from "./SmsDisclosure";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -35,6 +38,7 @@ export function AuthForm({
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [phone, setPhone] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -53,10 +57,18 @@ export function AuthForm({
       password: string;
       inviteCode: string;
       phone: string;
+      smsConsent: boolean;
     }) => ReturnType<typeof signUp.email>;
 
     const result = isSignUp
-      ? await signUpWithExtras({ name, email, password, inviteCode, phone })
+      ? await signUpWithExtras({
+          name,
+          email,
+          password,
+          inviteCode,
+          phone,
+          smsConsent,
+        })
       : await signIn.email({ email, password });
 
     if (result.error) {
@@ -117,6 +129,24 @@ export function AuthForm({
                   autoComplete="tel"
                   helperText="Only used to text you the week's shopping list. You can add it later."
                 />
+                {/*
+                 * Shown only once there is a number to agree about. An opt-in
+                 * beside an empty field is a question nobody has been asked
+                 * yet, and it makes the form longer for the people who are
+                 * going to skip the number anyway.
+                 */}
+                {phone.trim() ? (
+                  <Box>
+                    <SmsConsentCheckbox
+                      checked={smsConsent}
+                      onChange={setSmsConsent}
+                      disabled={busy}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <SmsDisclosure />
+                    </Box>
+                  </Box>
+                ) : null}
               </>
             ) : null}
 

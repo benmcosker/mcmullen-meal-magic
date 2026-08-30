@@ -1,3 +1,4 @@
+import { SmsConsentSource } from "@/generated/prisma/enums";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -18,6 +19,14 @@ function readPhone(body: unknown): string {
   if (typeof body !== "object" || body === null) return "";
   const phone = (body as { phone?: unknown }).phone;
   return typeof phone === "string" ? phone.trim() : "";
+}
+
+function readSmsConsent(body: unknown): boolean {
+  if (typeof body !== "object" || body === null) return false;
+  // Strictly true, never truthy: an absent field, an empty string or the
+  // string "false" all mean nobody ticked anything, and the one interpretation
+  // that must never be reached by accident is "they agreed".
+  return (body as { smsConsent?: unknown }).smsConsent === true;
 }
 
 function readEmail(body: unknown): string {
@@ -95,8 +104,24 @@ export const auth = betterAuth({
         // page afterwards, where a mistake can actually be seen and corrected.
         const phone = parsePhone(readPhone(ctx.body));
         if (phone.ok) {
+          // The tick is only honoured alongside a number that parsed. Consent
+          // recorded against a number the app failed to store would be a
+          // permission to text nobody, and it would read in an audit as an
+          // opt-in with nothing behind it.
+          const consented = readSmsConsent(ctx.body);
           await prisma.user
-            .update({ where: { id: userId }, data: { phone: phone.e164 } })
+            .update({
+              where: { id: userId },
+              data: {
+                phone: phone.e164,
+                ...(consented
+                  ? {
+                      smsConsentAt: new Date(),
+                      smsConsentSource: SmsConsentSource.CHECKBOX,
+                    }
+                  : {}),
+              },
+            })
             .catch((error) => {
               console.error("[signup] could not store phone", error);
             });

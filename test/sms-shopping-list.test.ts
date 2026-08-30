@@ -1,3 +1,4 @@
+import { SmsConsentSource } from "@/generated/prisma/enums";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const send = vi.hoisted(() => vi.fn());
@@ -66,8 +67,22 @@ describe.skipIf(!hasDb)("texting the shopping list", () => {
     });
   }
 
-  const setPhone = (id: string, phone: string | null) =>
-    prisma.user.update({ where: { id }, data: { phone } });
+  /**
+   * Give somebody a number, and by default the agreement that goes with it.
+   *
+   * Consent defaults to true because that is what these tests mean by "has a
+   * number" - a member who set one up and expects the list. Pass false for the
+   * case where a number is on file but nobody ticked the box.
+   */
+  const setPhone = (id: string, phone: string | null, consent = true) =>
+    prisma.user.update({
+      where: { id },
+      data: {
+        phone,
+        smsConsentAt: phone && consent ? new Date() : null,
+        smsConsentSource: phone && consent ? SmsConsentSource.CHECKBOX : null,
+      },
+    });
 
   const run = () =>
     textShoppingList({
@@ -103,7 +118,7 @@ describe.skipIf(!hasDb)("texting the shopping list", () => {
       await planADinner(["chicken breast"]);
 
       const result = await run();
-      expect(result.ok && result.skipped).toEqual(["Silent Sam"]);
+      expect(result.ok && result.withoutNumber).toEqual(["Silent Sam"]);
     });
 
     it("never texts another household's members", async () => {
@@ -164,8 +179,11 @@ describe.skipIf(!hasDb)("texting the shopping list", () => {
       const partner = await makeUser(householdId);
       await prisma.user.update({
         where: { id: partner },
-        data: { name: "Pat", phone: "+15552220000" },
+        data: { name: "Pat" },
       });
+      // Through setPhone, so Pat has agreed as well as being reachable -
+      // otherwise this tests the consent filter rather than the failure path.
+      await setPhone(partner, "+15552220000");
       await setPhone(userId, "+15551110000");
       await planADinner(["chicken breast"]);
 
@@ -224,9 +242,10 @@ describe.skipIf(!hasDb)("texting the shopping list", () => {
       });
       await setPhone(userId, "+15551110000");
 
-      const { recipients, skipped } = await shoppingListAudience(householdId);
+      const { recipients, withoutNumber } =
+        await shoppingListAudience(householdId);
       expect(recipients.map((r) => r.phone)).toEqual(["+15551110000"]);
-      expect(skipped).toEqual(["Pat"]);
+      expect(withoutNumber).toEqual(["Pat"]);
     });
   });
 });

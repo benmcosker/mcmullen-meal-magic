@@ -127,14 +127,24 @@ export async function revokeInviteAction(id: string): Promise<void> {
 }
 
 export type PhoneResult =
-  { ok: true; phone: string | null } | { ok: false; error: string };
+  | { ok: true; phone: string | null; consented: boolean }
+  | { ok: false; error: string };
 
-/** Set or clear your own number. Never anybody else's - see saveOwnPhone. */
-export async function saveMyPhoneAction(phone: string): Promise<PhoneResult> {
+/**
+ * Set or clear your own number, and whether you agree to be texted.
+ *
+ * Never anybody else's - see saveOwnPhone. The agreement travels with the
+ * number in one call because they are set by one form: a number saved without
+ * the box ticked is an address the app holds and will not use.
+ */
+export async function saveMyPhoneAction(
+  phone: string,
+  consent: boolean,
+): Promise<PhoneResult> {
   const user = await requireHousehold();
 
   try {
-    const result = await saveOwnPhone(user.id, phone);
+    const result = await saveOwnPhone(user.id, phone, consent);
     revalidatePath("/household");
     revalidatePath("/plan");
     return result;

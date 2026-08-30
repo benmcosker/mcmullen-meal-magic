@@ -32,6 +32,7 @@ export default async function HouseholdPage() {
             name: member.name,
             email: member.email,
             phone: member.phone,
+            smsConsented: member.smsConsented,
           })) ?? []
         }
         invites={invites.map((invite) => ({
@@ -45,6 +46,10 @@ export default async function HouseholdPage() {
         maxNameLength={MAX_HOUSEHOLD_NAME}
         myPhone={
           household?.members.find((m) => m.id === user.id)?.phone ?? null
+        }
+        myConsent={
+          household?.members.find((m) => m.id === user.id)?.smsConsented ??
+          false
         }
         smsConfigured={smsAvailable()}
       />
