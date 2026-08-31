@@ -101,7 +101,7 @@ export function inspectImage(bytes: Uint8Array): ImageInspection {
   // Named separately from the generic rejection. An iPhone photo is the most
   // likely thing to land here, and "that file is not an image" is both untrue
   // and unhelpful when the file is very much a photo.
-  if (isHeif(bytes)) {
+  if (looksLikeHeif(bytes)) {
     return {
       ok: false,
       reason:
@@ -116,8 +116,15 @@ export function inspectImage(bytes: Uint8Array): ImageInspection {
   };
 }
 
-/** ISO base media: bytes 4-8 are "ftyp", 8-12 the brand. */
-function isHeif(bytes: Uint8Array): boolean {
+/**
+ * ISO base media: bytes 4-8 are "ftyp", 8-12 the brand.
+ *
+ * Exported because the browser needs the same answer before deciding whether
+ * to pull in a HEIC decoder. Sniffing twelve bytes is free; the decoder is
+ * three megabytes, and asking it "is this HEIC?" would mean downloading it to
+ * find out that it is not.
+ */
+export function looksLikeHeif(bytes: Uint8Array): boolean {
   if (bytes.length < 12) return false;
 
   const ascii = (start: number, end: number) =>

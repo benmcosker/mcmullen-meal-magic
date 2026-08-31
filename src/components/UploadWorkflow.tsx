@@ -16,6 +16,7 @@ import {
   discardUploadAction,
   saveExtractedRecipeAction,
 } from "@/app/upload/actions";
+import { heicToJpeg } from "@/lib/heic";
 import type { ExtractedRecipe, RecipeInput } from "@/lib/recipe-schema";
 
 import { RecipePhoto } from "./RecipePhoto";
@@ -70,8 +71,12 @@ export function UploadWorkflow() {
     setError(null);
     setDuplicateOf(null);
 
+    // An iPhone photograph of a card arrives as HEIC unless the picker chose
+    // to transcode it, and nothing downstream can read one: not the model, not
+    // the server's own validation. Converting here means the upload succeeds
+    // instead of failing politely after the wait.
     const body = new FormData();
-    body.append("file", file);
+    body.append("file", await heicToJpeg(file));
 
     // Slightly beyond the server's own ceiling, so a server-side timeout
     // reports its own error rather than being masked by this one. Without any
