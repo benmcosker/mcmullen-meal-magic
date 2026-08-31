@@ -233,6 +233,112 @@ describe.skipIf(!hasDb)("texting the shopping list", () => {
     });
   });
 
+  describe("when somebody has replied STOP", () => {
+    /** What Twilio answers for a recipient who has opted out. */
+    const stopped = {
+      ok: false,
+      error: "Attempt to send to unsubscribed recipient",
+      code: 21610,
+    };
+
+    const consentOf = (id: string) =>
+      prisma.user.findUniqueOrThrow({
+        where: { id },
+        select: { phone: true, smsConsentAt: true, smsConsentSource: true },
+      });
+
+    it("writes the withdrawal down instead of failing again every week", async () => {
+      // Twilio answers STOP at its own edge and never tells the app, so this
+      // rejection is the only notice it ever gets. Ignoring it leaves the
+      // stored consent claiming a permission that was withdrawn.
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue(stopped);
+
+      await run();
+
+      const after = await consentOf(userId);
+      expect(after.smsConsentAt).toBeNull();
+      expect(after.smsConsentSource).toBeNull();
+    });
+
+    it("keeps their number, so agreeing again is a tick not a retype", async () => {
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue(stopped);
+
+      await run();
+
+      expect((await consentOf(userId)).phone).toBe("+15551110000");
+    });
+
+    it("stops including them once the withdrawal is recorded", async () => {
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue(stopped);
+      await run();
+
+      const audience = await shoppingListAudience(householdId);
+      expect(audience.recipients).toEqual([]);
+      expect(audience.withoutConsent).toEqual(["Cook"]);
+    });
+
+    it("names them apart from a send that actually went wrong", async () => {
+      // One asked to stop and one could not be reached: the first needs
+      // nothing doing about it, the second might.
+      const partner = await makeUser(householdId);
+      await prisma.user.update({
+        where: { id: partner },
+        data: { name: "Pat" },
+      });
+      await setPhone(partner, "+15552220000");
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+
+      send.mockImplementation(async (to: string) =>
+        to === "+15552220000" ? stopped : { ok: true },
+      );
+
+      const result = await run();
+      expect(result.ok && result.unsubscribed).toEqual(["Pat"]);
+      expect(result.ok && result.failed).toEqual([]);
+      expect(result.ok && result.delivered).toEqual(["Cook"]);
+    });
+
+    it("leaves consent alone when the failure was anything else", async () => {
+      // An unreachable handset or a bad number is a transient problem, and
+      // treating it as a withdrawal would quietly unsubscribe somebody who
+      // never asked to be.
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue({
+        ok: false,
+        error: "unknown destination",
+        code: 30005,
+      });
+
+      await run();
+
+      expect((await consentOf(userId)).smsConsentAt).not.toBeNull();
+    });
+
+    it("says so plainly when the only recipient had stopped", async () => {
+      // "The message could not be sent" would send somebody hunting for a
+      // fault in the app when the answer is that Pat asked them not to.
+      await setPhone(userId, "+15551110000");
+      await prisma.user.update({
+        where: { id: userId },
+        data: { name: "Pat" },
+      });
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue(stopped);
+
+      const result = await run();
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.error).toMatch(/Pat replied STOP/);
+    });
+  });
+
   describe("shoppingListAudience", () => {
     it("separates who can be reached from who cannot", async () => {
       const partner = await makeUser(householdId);

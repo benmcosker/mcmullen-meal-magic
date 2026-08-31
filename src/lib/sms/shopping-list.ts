@@ -8,6 +8,7 @@ import {
 import { listPantryItems } from "../pantry";
 import { formatAsPlainText } from "../shopping/format";
 import { getSender, smsAvailable } from "./index";
+import { TWILIO_UNSUBSCRIBED } from "./twilio";
 import { shoppingListMessage, splitMessage } from "./message";
 import type { SendOutcome, SmsRecipient } from "./types";
 
@@ -19,12 +20,38 @@ export type TextListResult =
       delivered: string[];
       /** Named individually: a partial failure is not a failure. */
       failed: { name: string; error: string }[];
+      /** Members who have replied STOP; their consent has just been cleared. */
+      unsubscribed: string[];
       /** Members with no number on file, so the gap is visible. */
       withoutNumber: string[];
       /** Members who have a number but have not agreed to be texted. */
       withoutConsent: string[];
     }
   | { ok: false; error: string };
+
+/**
+ * Record that somebody has opted out, without touching their number.
+ *
+ * The same shape as unticking the box on the Household page: the number stays,
+ * so re-agreeing later is a tick rather than typing it again, and clearing
+ * `smsConsentSource` alongside the date keeps the two columns from disagreeing
+ * about whether there is a consent at all.
+ *
+ * Failure here is logged rather than thrown. The message did not go out either
+ * way, and losing the report of a partial send - which tells the household who
+ * did get the list - would be a worse outcome than a consent row that stays
+ * stale until the next attempt tries again.
+ */
+async function withdrawConsent(userId: string): Promise<void> {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { smsConsentAt: null, smsConsentSource: null },
+    });
+  } catch (error) {
+    console.error("[sms] could not record a STOP reply", error);
+  }
+}
 
 /**
  * Everyone in the household who may be texted, and everyone who may not.
@@ -48,17 +75,23 @@ export async function shoppingListAudience(householdId: string): Promise<{
 }> {
   const members = await prisma.user.findMany({
     where: { householdId },
-    select: { name: true, phone: true, smsConsentAt: true },
+    select: { id: true, name: true, phone: true, smsConsentAt: true },
     orderBy: { createdAt: "asc" },
   });
 
   return {
     recipients: members
       .filter(
-        (m): m is { name: string; phone: string; smsConsentAt: Date } =>
-          Boolean(m.phone) && m.smsConsentAt !== null,
+        (
+          m,
+        ): m is {
+          id: string;
+          name: string;
+          phone: string;
+          smsConsentAt: Date;
+        } => Boolean(m.phone) && m.smsConsentAt !== null,
       )
-      .map((m) => ({ name: m.name, phone: m.phone })),
+      .map((m) => ({ id: m.id, name: m.name, phone: m.phone })),
     withoutNumber: members.filter((m) => !m.phone).map((m) => m.name),
     withoutConsent: members
       .filter((m) => m.phone && m.smsConsentAt === null)
@@ -121,30 +154,69 @@ export async function textShoppingList(params: {
   // for a list split across three messages is worse than waiting.
   const outcomes: SendOutcome[] = [];
   for (const recipient of recipients) {
-    let failure: string | null = null;
+    let failure: { error: string; code?: number } | null = null;
     for (const part of parts) {
       const result = await sender.send(recipient.phone, part);
       if (!result.ok) {
-        failure = result.error;
+        failure = {
+          error: result.error,
+          ...(result.code ? { code: result.code } : {}),
+        };
         break;
       }
     }
-    outcomes.push(
-      failure
-        ? { ok: false, recipient, error: failure }
-        : { ok: true, recipient, parts: parts.length },
-    );
+
+    if (!failure) {
+      outcomes.push({ ok: true, recipient, parts: parts.length });
+      continue;
+    }
+
+    // Twilio answers STOP at its own edge and never tells the application, so
+    // this rejection is the only notice the app ever gets that somebody has
+    // opted out. Without acting on it the send fails again every week forever,
+    // and - worse - the stored consent goes on claiming a permission that was
+    // withdrawn, which is the one thing the record exists to be right about.
+    const unsubscribed = failure.code === TWILIO_UNSUBSCRIBED;
+    if (unsubscribed) {
+      await withdrawConsent(recipient.id);
+    }
+
+    outcomes.push({
+      ok: false,
+      recipient,
+      error: failure.error,
+      ...(unsubscribed ? { unsubscribed: true } : {}),
+    });
   }
 
   const delivered = outcomes.filter((o) => o.ok).map((o) => o.recipient.name);
-  const failed = outcomes
-    .filter((o): o is Extract<SendOutcome, { ok: false }> => !o.ok)
+  const failures = outcomes.filter(
+    (o): o is Extract<SendOutcome, { ok: false }> => !o.ok,
+  );
+  const failed = failures
+    .filter((o) => !o.unsubscribed)
     .map((o) => ({ name: o.recipient.name, error: o.error }));
+  // Named apart from the failures: nothing went wrong, somebody asked to stop.
+  const unsubscribed = failures
+    .filter((o) => o.unsubscribed)
+    .map((o) => o.recipient.name);
 
   // Reported as a success with the failures named, rather than an outright
   // failure, when anybody got it: telling somebody the send failed when the
   // list is already on their partner's phone sends them to do it again.
   if (delivered.length === 0) {
+    // A send where the only recipient had replied STOP is not a failure to
+    // explain, it is an answer: reporting Twilio's "unsubscribed recipient" or
+    // a flat "could not be sent" would send somebody looking for a fault in
+    // the app. Their consent has just been cleared, so the planner will show
+    // them as not agreed from here on.
+    if (unsubscribed.length > 0 && failed.length === 0) {
+      return {
+        ok: false,
+        error: `${formatList(unsubscribed)} replied STOP, so nobody is left to text. They can start again by ticking the box on the household page.`,
+      };
+    }
+
     return {
       ok: false,
       error: failed[0]?.error ?? "The message could not be sent.",
@@ -156,7 +228,14 @@ export async function textShoppingList(params: {
     parts: parts.length,
     delivered,
     failed,
+    unsubscribed,
     withoutNumber,
     withoutConsent,
   };
+}
+
+/** "Ben", "Ben and Laura", "Ben, Laura and Pat". */
+function formatList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "nobody";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
