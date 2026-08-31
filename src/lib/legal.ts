@@ -54,15 +54,37 @@ export const SMS_HELP_STOP =
   `You can also clear your number on the Household page, or email ${CONTACT_EMAIL}.`;
 
 /**
- * The non-sharing promise.
+ * The non-sharing promise, in the words the vetting reviewer looks for.
  *
- * Carriers require this stated explicitly in the privacy policy, and it is the
- * single most common reason a campaign is rejected. It is also simply true of
- * this app: the only place a number goes is Twilio, to carry the message.
+ * Deliberately close to verbatim from Twilio's own example of language that
+ * passes review (error 30908). An earlier wording said the same thing in
+ * better English - "are never shared with third parties or affiliates" - and
+ * the campaign was rejected. Vetting is largely pattern-matching, so matching
+ * the pattern is worth more here than the prose is.
+ *
+ * "share, sell, or provide" rather than just "share": the three verbs are what
+ * the reviewer scans for, and dropping two of them leaves a gap they read as
+ * an omission.
  */
 export const SMS_NO_SHARING =
-  "Mobile numbers and consent to receive text messages are never shared with " +
-  "third parties or affiliates for marketing or promotional purposes.";
+  "We do not share, sell, or provide your mobile phone number or messaging " +
+  "consent data to third parties or affiliates for marketing or promotional " +
+  "purposes.";
+
+/**
+ * How Twilio is described, wherever it is mentioned.
+ *
+ * The policy has to name it - the number really does leave this app - but a
+ * bare "the number is passed to Twilio" is read by a reviewer scanning for
+ * disclosure of sharing as exactly that, which contradicts the sentence above
+ * and gets the campaign refused for conflicting information. Naming the
+ * relationship, rather than only the company, is what resolves it.
+ */
+export const SMS_PROVIDER =
+  "Text messages are delivered through Twilio, our messaging service " +
+  "provider, acting only to transmit messages on our behalf. Twilio is not a " +
+  "marketing partner, receives no information for its own marketing use, and " +
+  "no other third party receives your mobile number.";
 
 /** Shown at the foot of each policy so a reviewer can see it is current. */
 export const LEGAL_UPDATED = "30 August 2026";

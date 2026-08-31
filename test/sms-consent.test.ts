@@ -3,7 +3,12 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { SmsConsentSource } from "@/generated/prisma/enums";
 import { getHousehold, saveOwnPhone } from "@/lib/household";
-import { SMS_CONSENT_LABEL, SMS_FREQUENCY, SMS_NO_SHARING } from "@/lib/legal";
+import {
+  SMS_CONSENT_LABEL,
+  SMS_FREQUENCY,
+  SMS_NO_SHARING,
+  SMS_PROVIDER,
+} from "@/lib/legal";
 import { shoppingListAudience } from "@/lib/sms/shopping-list";
 
 import { makeHousehold, makeUser, resetDatabase } from "./support/db";
@@ -195,9 +200,21 @@ describe("the disclosures", () => {
     expect(SMS_CONSENT_LABEL).toContain(SMS_FREQUENCY);
   });
 
-  it("promises in as many words that numbers are not shared", () => {
-    // The single most common reason a 10DLC registration is refused.
-    expect(SMS_NO_SHARING).toMatch(/never shared/i);
-    expect(SMS_NO_SHARING).toMatch(/third parties/i);
+  it("promises in the words the reviewer scans for that numbers are not shared", () => {
+    // The single most common reason a 10DLC registration is refused, and this
+    // campaign was refused once for saying it in better English than this.
+    // All three verbs, because a reviewer scanning for the phrase reads two
+    // missing ones as an omission rather than as concision.
+    expect(SMS_NO_SHARING).toMatch(/do not share, sell, or provide/i);
+    expect(SMS_NO_SHARING).toMatch(/third parties or affiliates/i);
+    expect(SMS_NO_SHARING).toMatch(/marketing or promotional purposes/i);
+  });
+
+  it("says what Twilio is to us, not only that it is involved", () => {
+    // "The number is passed to Twilio" on its own reads as disclosure of
+    // sharing and contradicts the sentence above - which is refused as
+    // conflicting information rather than as a missing statement.
+    expect(SMS_PROVIDER).toMatch(/service provider/i);
+    expect(SMS_PROVIDER).toMatch(/not a marketing partner/i);
   });
 });
