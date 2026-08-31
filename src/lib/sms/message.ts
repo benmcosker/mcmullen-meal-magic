@@ -2,6 +2,8 @@
  * Turning a shopping list into messages a phone will actually show.
  */
 
+import { BRAND } from "../legal";
+
 /**
  * How much text goes in one message before it is split.
  *
@@ -118,10 +120,27 @@ export function splitMessage(
   return parts.map((part, index) => `${part} (${index + 1}/${parts.length})`);
 }
 
-/** The heading a shopping list message opens with. */
+/**
+ * The whole message: who it is from, which week, the list, and the way out.
+ *
+ * Named on purpose. A text arriving from an unfamiliar number with a bare
+ * list of groceries is indistinguishable from spam - to the person reading it,
+ * and to the carrier deciding whether to carry it. US carriers judge
+ * registered traffic against the sample messages on the campaign, and samples
+ * are required to identify the brand, so an unbranded message is a mismatch
+ * with its own registration.
+ *
+ * The opt-out line rides along for the same reason. It costs a few characters
+ * once per message rather than once per part, since it is appended before the
+ * split.
+ *
+ * A plain hyphen rather than an em dash: `toPlainText` would convert one
+ * anyway, and a character that forces the whole message into UCS-2 is not
+ * worth spending on punctuation.
+ */
 export function shoppingListMessage(
   weekLabel: string,
   listText: string,
 ): string {
-  return `Shopping for ${weekLabel}\n\n${listText}`;
+  return `${BRAND} - shopping for ${weekLabel}\n\n${listText}\n\nReply STOP to unsubscribe.`;
 }

@@ -100,11 +100,21 @@ describe("splitMessage", () => {
 });
 
 describe("shoppingListMessage", () => {
-  it("says which week it is for", () => {
-    // The message arrives days after it was asked for, sometimes next to last
-    // week's, and an unlabelled list is indistinguishable from the wrong one.
+  it("says who it is from, which week, and how to stop", () => {
+    // The week because the message arrives days after it was asked for,
+    // sometimes beside last week's, and an unlabelled list is
+    // indistinguishable from the wrong one. The name because an unfamiliar
+    // number sending a bare list of groceries reads as spam to the recipient
+    // and to the carrier alike.
     expect(shoppingListMessage("week of 24 Aug", "Produce:\n2 lemons")).toBe(
-      "Shopping for week of 24 Aug\n\nProduce:\n2 lemons",
+      "McMullen Meal Magic - shopping for week of 24 Aug\n\n" +
+        "Produce:\n2 lemons\n\nReply STOP to unsubscribe.",
     );
+  });
+
+  it("carries no character that would force the message into UCS-2", () => {
+    // A dash in the heading would double the cost of every list sent.
+    const message = shoppingListMessage("week of 24 Aug", "Produce:\n2 lemons");
+    expect(toPlainText(message)).toBe(message);
   });
 });
