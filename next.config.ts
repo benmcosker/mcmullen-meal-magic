@@ -34,6 +34,28 @@ const nextConfig: NextConfig = {
      */
     minimumCacheTTL: 60 * 60 * 24 * 31,
   },
+
+  /**
+   * The policy pages moved up from /legal/* to the root.
+   *
+   * They are the URLs a carrier is given when registering the messaging
+   * campaign, and /privacy is the path a reviewer - or a crawler probing for
+   * one - tries first. Kept as redirects rather than served at both paths:
+   * "multiple or conflicting privacy policies" is itself a listed reason for
+   * refusing a campaign, so there must be exactly one page, findable by either
+   * name.
+   *
+   * Permanent, because these are the addresses of the documents now, and a
+   * temporary redirect invites a crawler to keep asking for the old one.
+   */
+  async redirects() {
+    return [
+      { source: "/legal/privacy", destination: "/privacy", permanent: true },
+      { source: "/legal/terms", destination: "/terms", permanent: true },
+      { source: "/legal/sms", destination: "/sms", permanent: true },
+      { source: "/legal", destination: "/privacy", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

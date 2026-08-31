@@ -50,13 +50,13 @@ export function SiteFooter() {
         <Typography variant="body2" color="text.secondary">
           {BRAND}
         </Typography>
-        <Link href="/legal/privacy" variant="body2">
+        <Link href="/privacy" variant="body2">
           Privacy Policy
         </Link>
-        <Link href="/legal/terms" variant="body2">
+        <Link href="/terms" variant="body2">
           Terms of Service
         </Link>
-        <Link href="/legal/sms" variant="body2">
+        <Link href="/sms" variant="body2">
           Text messages
         </Link>
       </Box>
