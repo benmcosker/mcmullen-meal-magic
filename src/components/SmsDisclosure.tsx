@@ -46,9 +46,9 @@ export function SmsDisclosure() {
         <strong>Help &amp; Stop:</strong> {SMS_HELP_STOP}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        <Link href="/legal/terms">Terms of Service</Link>
+        <Link href="/terms">Terms of Service</Link>
         {" | "}
-        <Link href="/legal/privacy">Privacy Policy</Link>
+        <Link href="/privacy">Privacy Policy</Link>
       </Typography>
     </Box>
   );
