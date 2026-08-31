@@ -8,6 +8,8 @@ import Stack from "@mui/material/Stack";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
+import { heicToJpeg } from "@/lib/heic";
+
 /**
  * The longest edge a dish photo needs.
  *
@@ -58,13 +60,18 @@ export function RecipeImageUploader({
     const body = new FormData();
     body.set("recipeId", recipeId);
 
+    // HEIC first, because the canvas below cannot decode one outside Safari.
+    // Converting it turns "this failed on Chrome and worked on your phone"
+    // into one path that behaves the same everywhere.
+    const decodable = await heicToJpeg(file);
+
     try {
-      body.set("file", await downscale(file));
+      body.set("file", await downscale(decodable));
     } catch {
-      // Anything the browser cannot decode - a HEIC on a non-Safari browser,
-      // a file that is not really an image - falls through to the server,
-      // which identifies it by its bytes and says so properly.
-      body.set("file", file);
+      // Anything the browser still cannot decode - a file that is not really
+      // an image, or a HEIC the converter could not read - falls through to
+      // the server, which identifies it by its bytes and says so properly.
+      body.set("file", decodable);
     }
 
     await send(body);
@@ -100,10 +107,18 @@ export function RecipeImageUploader({
         ) : null}
       </Stack>
 
+      {/*
+       * Not "image/*", and deliberately without image/heic: naming HEIC in an
+       * accept list makes Safari hand over the original rather than
+       * transcoding, and has been observed to make it convert JPEGs *into*
+       * HEIC. The list is a hint that nudges the picker towards something
+       * sensible; heicToJpeg is the actual safety net, since accept is
+       * advisory and phone pickers routinely ignore it.
+       */}
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif,image/webp"
         hidden
         onChange={(event) => {
           const file = event.target.files?.[0];

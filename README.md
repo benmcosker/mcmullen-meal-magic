@@ -45,8 +45,7 @@ striped placeholders are what the app draws when a recipe has none.
   Photographs are accepted as JPEG, PNG, GIF or WebP - the four formats the
   model itself accepts - so a picture of a card stuck to the fridge, or of a
   page in a book, works as well as an exported file. HEIC, which is what an
-  iPhone stores by default, is refused with an explanation rather than a
-  failure: share it as a JPEG instead.
+  iPhone stores by default, is converted in the browser before it is sent.
 - **Reviews.** A star rating and, optionally, what you thought - one review per
   person per recipe, so the average says how many people liked a dish rather
   than how often its keenest fan said so. The average shows on the library
@@ -246,6 +245,38 @@ unreachable from the build environment, so the request is covered by tests
 against a stubbed transport rather than a real response. Since applications are
 closed there is currently no way to verify it against a real response — do that
 before trusting it, whenever a key becomes obtainable.
+
+**HEIC is converted in the browser, and the decoder is only fetched when one
+turns up.** An iPhone stores photos as HEIC, and nothing downstream reads one:
+not the Claude API, not the app's own validation, not most browsers' decoders.
+iOS often transcodes to JPEG when a file input asks for JPEG - but only often.
+Chrome on iOS, the Files app, Android, and a HEIC that reached a laptop by
+AirDrop all hand over the original.
+
+So the first twelve bytes of any picked file are sniffed, and a HEIC pulls in
+`heic-to` through a dynamic import. That decoder is about three megabytes of
+WebAssembly, which is why it is not in the main bundle: opening the upload page
+does not fetch it, and somebody who only ever uploads JPEGs never does.
+
+A conversion that fails hands back the original untouched rather than throwing.
+The server then identifies it by its bytes and gives the clear explanation it
+always did - a failure here should cost the good error message, not replace it
+with a worse one.
+
+Neither file input lists `image/heic` in its `accept`, deliberately. Naming it
+makes Safari hand over the original instead of transcoding, and has been
+observed to make Safari convert JPEGs _into_ HEIC. The accept list is a hint
+that nudges the picker; the conversion is the actual safety net, since accept
+is advisory and phone pickers routinely ignore it.
+
+**A real HEIC has never been through this.** The environment it was built in
+has no HEIC encoder, so the tests cover the sniffing, the dynamic import, the
+renaming and the fallback - all against a synthetic file with a genuine HEIC
+header and a body no decoder could read. The path was also driven in a browser:
+the decoder chunk is fetched when a `.heic` is picked and not before, and the
+failure falls through to the server's message. What is unproven is one real
+photo from one real iPhone coming out the other side as a readable JPEG. Try it
+before relying on it.
 
 **Pulling the dish photo out of a PDF is JPEG-only.** Images stored as
 DCTDecode streams are already complete JPEG files and can be written straight
