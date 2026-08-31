@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { getCurrentUser } from "@/lib/session";
 import { PAGE_MAX_WIDTH, PAGE_PADDING_X } from "@/theme/page";
 
+import { SiteFooter } from "./SiteFooter";
 import { TopBar } from "./TopBar";
 
 export async function AppShell({ children }: { children: ReactNode }) {
@@ -32,6 +33,12 @@ export async function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </Box>
+      {/*
+       * Below every page, signed in or not. See SiteFooter: the policy links
+       * have to be reachable from the site itself, not only from the URLs a
+       * campaign registration happens to name.
+       */}
+      <SiteFooter />
     </Box>
   );
 }
