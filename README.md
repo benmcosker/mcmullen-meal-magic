@@ -1,8 +1,33 @@
 # Meal Magic
 
 Recipe box, weekly meal planner and grocery list for the McMullen household.
-Upload a recipe PDF, plan a dinner for each night from your library, and take
-the resulting shopping list to the shop.
+Upload a recipe card - a PDF, or a photograph of a printed or handwritten one -
+plan a dinner for each night from your library, and take the resulting shopping
+list to the shop.
+
+## What it looks like
+
+The library, newest dish given the hero and the rest in a grid. Collections are
+a curated way in; everything else lives behind Filters.
+
+![The recipe library](docs/screenshots/recipes.png)
+
+A recipe, with everything the card printed: timings, resting, oven temperature,
+equipment, and what the household thought of it.
+
+![A recipe](docs/screenshots/recipe.png)
+
+The week, and the list it produces. Ingredients roll up across the meals
+planned, grouped by aisle, with the dish each line came from underneath it.
+
+![The weekly planner](docs/screenshots/planner.png)
+
+Upload takes a PDF or a photograph of a card.
+
+![Uploading a recipe card](docs/screenshots/upload.png)
+
+Screenshots are of a seeded demo library, so no dish photos are attached - the
+striped placeholders are what the app draws when a recipe has none.
 
 ## What works
 
@@ -14,16 +39,21 @@ the resulting shopping list to the shop.
 - **Search.** Full-text plus substring matching across titles, descriptions,
   method text, ingredients and tags, with tag filters. Search state lives in the
   URL, so a filtered view is linkable.
-- **PDF upload.** Signed-in users upload a recipe PDF; Claude extracts the
-  fields and the dish photo is pulled out of the PDF, both landing on a review
-  screen before anything is saved.
+- **Card upload, PDF or photograph.** Signed-in users upload a recipe card and
+  Claude reads it into fields, landing on a review screen before anything is
+  saved. A PDF also gives up its dish photo, which is pulled out and attached.
+  Photographs are accepted as JPEG, PNG, GIF or WebP - the four formats the
+  model itself accepts - so a picture of a card stuck to the fridge, or of a
+  page in a book, works as well as an exported file. HEIC, which is what an
+  iPhone stores by default, is refused with an explanation rather than a
+  failure: share it as a JPEG instead.
 - **Reviews.** A star rating and, optionally, what you thought - one review per
   person per recipe, so the average says how many people liked a dish rather
   than how often its keenest fan said so. The average shows on the library
   cards, the planner tiles and the recipe itself.
-- **Duplicate detection.** A re-uploaded PDF is recognised by its bytes and
-  refused before the model is called; a familiar-looking title warns rather
-  than blocks.
+- **Duplicate detection.** A re-uploaded card - PDF or photograph - is
+  recognised by its bytes and refused before the model is called; a
+  familiar-looking title warns rather than blocks.
 - **Weekly planner.** One dinner a night, picked from tiles showing the dish
   photo, title and its rating.
 - **Pantry.** The staples you always have in, managed as a list of their own.
@@ -35,6 +65,10 @@ the resulting shopping list to the shop.
   search link per ingredient plus a copyable list). An Instacart provider that
   builds a real cart is written and tested but hidden until a key exists — see
   below.
+- **Texting the list.** Everyone in the household who has given a number and
+  agreed to be texted gets the week's shopping as an SMS, split into readable
+  parts. Written, tested and deployed; not yet carrying traffic, because US
+  carriers require a registration that is still in review — see below.
 
 ## Stack
 
@@ -46,7 +80,7 @@ the resulting shopping list to the shop.
 | Database  | Postgres via Prisma 7                         |
 | Auth      | Better Auth (email + password, invite-gated)  |
 | Storage   | Vercel Blob, with a local-disk driver for dev |
-| AI        | Claude for PDF extraction                     |
+| AI        | Claude, for reading recipe cards              |
 | Tests     | Vitest, against a real Postgres               |
 
 ## Getting started
@@ -62,15 +96,18 @@ You need a Postgres instance. Anything works locally; production is Neon.
 
 ### Environment
 
-| Variable                | Needed for            | Notes                                            |
-| ----------------------- | --------------------- | ------------------------------------------------ |
-| `DATABASE_URL`          | everything            | Postgres connection string                       |
-| `BETTER_AUTH_SECRET`    | sessions              | `openssl rand -base64 32`                        |
-| `BETTER_AUTH_URL`       | sessions              | The app's own origin                             |
-| `ANTHROPIC_API_KEY`     | PDF extraction        | Without it, upload returns a clear 422           |
-| `INSTACART_API_KEY`     | sending a cart        | Without it, the planner says so and stays usable |
-| `INSTACART_API_BASE`    | sending a cart        | Dev server by default; switch for production     |
-| `BLOB_READ_WRITE_TOKEN` | uploads in production | Unset locally: files go to `public/uploads/`     |
+| Variable                | Needed for            | Notes                                              |
+| ----------------------- | --------------------- | -------------------------------------------------- |
+| `DATABASE_URL`          | everything            | Postgres connection string                         |
+| `BETTER_AUTH_SECRET`    | sessions              | `openssl rand -base64 32`                          |
+| `BETTER_AUTH_URL`       | sessions              | The app's own origin                               |
+| `ANTHROPIC_API_KEY`     | reading a card        | Without it, upload returns a clear 422             |
+| `INSTACART_API_KEY`     | sending a cart        | Without it, the planner says so and stays usable   |
+| `INSTACART_API_BASE`    | sending a cart        | Dev server by default; switch for production       |
+| `BLOB_READ_WRITE_TOKEN` | uploads in production | Unset locally: files go to `public/uploads/`       |
+| `TWILIO_ACCOUNT_SID`    | texting the list      | All three are needed; any missing hides the button |
+| `TWILIO_AUTH_TOKEN`     | texting the list      | The account's auth token, not an API key secret    |
+| `TWILIO_FROM_NUMBER`    | texting the list      | E.164, e.g. `+15085551212`                         |
 
 Missing optional keys degrade gracefully — the rest of the app keeps working
 and the affected feature explains what is missing.
@@ -123,6 +160,46 @@ means running them against a database you care about will empty it.
 
 ## Notes and limitations
 
+**Texting is built but not yet switched on.** The sender, the consent flow and
+the shopping-list message all exist, are tested, and are deployed. What is
+missing is permission from the carriers.
+
+US carriers will not carry application-sent SMS to ordinary numbers until the
+sender is registered under A2P 10DLC: a Brand, then a Campaign describing what
+the messages are and how people agreed to receive them. Unregistered traffic is
+not bounced, it is silently dropped — the API accepts the message and the
+handset never rings, which is the worst failure shape there is. That
+registration is in review.
+
+What the app does in the meantime: `smsAvailable()` requires all three Twilio
+variables, and the planner hides the button entirely rather than offering one
+that cannot work.
+
+The consent side is finished and is what the registration is built on:
+
+- A number is only ever entered by its owner. `saveOwnPhone` writes the
+  caller's own row and nothing else — a digit wrong sends the week's shopping
+  to a stranger.
+- A number is not consent. `smsConsentAt` and `smsConsentSource` are stored
+  separately, because being reachable and having agreed are two different
+  facts, and a carrier asking to see the opt-in is asking about the second.
+- The checkbox is never pre-ticked, and there is no prop that would let it be.
+- `/privacy`, `/terms` and `/sms` are public, deliberately outside the login,
+  because a policy nobody can read without an account is a policy a reviewer
+  will reject. The wording lives in `src/lib/legal.ts` so the box, the pages
+  and the campaign submission cannot drift apart.
+- A reply of STOP is handled by Twilio, which never tells the application. The
+  only notice is a `21610` on the next send, and that clears the person's
+  consent while keeping their number — so re-agreeing is a tick rather than
+  typing it in again.
+
+**The app cannot tell you a text was delivered.** Twilio answers `201` when it
+accepts a message for delivery, which is not the same as a carrier handing it
+to a handset, and that response is all the sender sees. So a send that is
+filtered downstream is reported as a success. Real delivery state needs a
+status-callback webhook, which does not exist yet; until it does, Twilio's
+Messaging logs are the only place the truth lives.
+
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
 integration surface — nothing after the hand-off is visible to this app.
@@ -170,11 +247,15 @@ against a stubbed transport rather than a real response. Since applications are
 closed there is currently no way to verify it against a real response — do that
 before trusting it, whenever a key becomes obtainable.
 
-**PDF photo extraction is JPEG-only.** Images stored as DCTDecode streams are
-already complete JPEG files and can be written straight out. Other encodings
-hold raw samples that would need colour-space handling and a PNG encoder.
-Recipe photos are nearly always JPEG; one that is not simply arrives without a
-photo, and can be added by hand.
+**Pulling the dish photo out of a PDF is JPEG-only.** Images stored as
+DCTDecode streams are already complete JPEG files and can be written straight
+out. Other encodings hold raw samples that would need colour-space handling and
+a PNG encoder. Recipe photos are nearly always JPEG; one that is not simply
+arrives without a photo, and can be added by hand.
+
+This applies only to PDFs. An uploaded photograph is the card itself rather
+than a container holding a picture, so nothing is extracted from it - the file
+is kept as the source card and the recipe starts with no dish photo.
 
 **Unit merging is conservative.** Synonyms fold together (`tablespoons` →
 `tbsp`), but nothing converts between units — 1 cup and 200 ml stay as two
