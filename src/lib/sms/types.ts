@@ -7,6 +7,8 @@
  */
 
 export type SmsRecipient = {
+  /** Whose account this is, so a withdrawal can be written back against it. */
+  id: string;
   /** E.164. */
   phone: string;
   /** Who it belongs to, for reporting a partial failure usefully. */
@@ -15,7 +17,13 @@ export type SmsRecipient = {
 
 export type SendOutcome =
   | { ok: true; recipient: SmsRecipient; parts: number }
-  | { ok: false; recipient: SmsRecipient; error: string };
+  | {
+      ok: false;
+      recipient: SmsRecipient;
+      error: string;
+      /** True when the failure was this person having replied STOP. */
+      unsubscribed?: boolean;
+    };
 
 export type SmsSenderInfo = {
   id: string;
@@ -26,6 +34,22 @@ export type SmsSenderInfo = {
   unavailableReason?: string;
 };
 
+export type SmsSendResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      /**
+       * The provider's own code for the failure, where it has one.
+       *
+       * Carried rather than folded into the message because one of these has
+       * to be acted on: a recipient who has replied STOP is not a transient
+       * error to be retried next week, it is a person who has withdrawn, and
+       * the app's own record needs to learn that.
+       */
+      code?: number;
+    };
+
 export type SmsSender = {
   info(): SmsSenderInfo;
   /**
@@ -35,8 +59,5 @@ export type SmsSender = {
    * list is divided is a question about shopping lists, and every adapter
    * would otherwise have to answer it identically.
    */
-  send(
-    to: string,
-    body: string,
-  ): Promise<{ ok: true } | { ok: false; error: string }>;
+  send(to: string, body: string): Promise<SmsSendResult>;
 };

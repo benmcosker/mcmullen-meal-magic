@@ -146,7 +146,17 @@ export async function textShoppingListAction(
     ? ` ${formatNames(result.withoutConsent)} ${result.withoutConsent.length === 1 ? "has" : "have"} not agreed to be texted.`
     : "";
 
-  return { ok: true, message: `${sent}${failed}${noNumber}${noConsent}` };
+  // Said before the gaps, because it is the only one that changed something:
+  // their consent has just been cleared, and the planner will show them as not
+  // agreed from now on.
+  const stopped = result.unsubscribed.length
+    ? ` ${formatNames(result.unsubscribed)} ${result.unsubscribed.length === 1 ? "has" : "have"} replied STOP and will no longer be texted.`
+    : "";
+
+  return {
+    ok: true,
+    message: `${sent}${failed}${stopped}${noNumber}${noConsent}`,
+  };
 }
 
 /** "Ben", "Ben and Laura", "Ben, Laura and Pat". */

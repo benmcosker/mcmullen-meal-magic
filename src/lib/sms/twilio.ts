@@ -1,6 +1,15 @@
 import type { SmsSender, SmsSenderInfo } from "./types";
 
 /**
+ * Twilio's code for "attempt to send to unsubscribed recipient".
+ *
+ * Twilio answers STOP itself, at its own edge, and never tells the
+ * application - so this rejection is the only way the app finds out somebody
+ * has opted out.
+ */
+export const TWILIO_UNSUBSCRIBED = 21610;
+
+/**
  * Twilio, over its REST API directly.
  *
  * No SDK: sending one message is a form-encoded POST to one URL, and the
@@ -59,14 +68,17 @@ export const twilioSender: SmsSender = {
       // Twilio's own message is the useful part - "unverified number on a trial
       // account", "not a mobile number" - and it names no secret, so it is worth
       // passing through rather than flattening to "failed".
-      const detail = await response
+      const failure: { message?: string; code?: number } | null = await response
         .json()
-        .then((body: { message?: string }) => body?.message)
+        .then((json) => json as { message?: string; code?: number })
         .catch(() => null);
 
       return {
         ok: false,
-        error: detail ?? `Twilio refused the message (${response.status}).`,
+        error:
+          failure?.message ??
+          `Twilio refused the message (${response.status}).`,
+        ...(typeof failure?.code === "number" ? { code: failure.code } : {}),
       };
     } catch (error) {
       // A network failure reaching Twilio, which is not the same as Twilio
