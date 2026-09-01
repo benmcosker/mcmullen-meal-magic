@@ -66,8 +66,7 @@ striped placeholders are what the app draws when a recipe has none.
   below.
 - **Texting the list.** Everyone in the household who has given a number and
   agreed to be texted gets the week's shopping as an SMS, split into readable
-  parts. Written, tested and deployed; not yet carrying traffic, because US
-  carriers require a registration that is still in review — see below.
+  parts. Live: registered with the carriers and delivering.
 
 ## Stack
 
@@ -159,22 +158,35 @@ means running them against a database you care about will empty it.
 
 ## Notes and limitations
 
-**Texting is built but not yet switched on.** The sender, the consent flow and
-the shopping-list message all exist, are tested, and are deployed. What is
-missing is permission from the carriers.
+**Texting works, and getting there was most of the work.** The sender itself is
+one form-encoded POST. Everything around it exists because US carriers will not
+carry application-sent SMS to ordinary numbers until the sender is registered
+under A2P 10DLC: a Brand, then a Campaign describing what the messages are and
+how people agreed to receive them.
 
-US carriers will not carry application-sent SMS to ordinary numbers until the
-sender is registered under A2P 10DLC: a Brand, then a Campaign describing what
-the messages are and how people agreed to receive them. Unregistered traffic is
-not bounced, it is silently dropped — the API accepts the message and the
-handset never rings, which is the worst failure shape there is. That
-registration is in review.
+Unregistered traffic is not bounced, it is silently dropped — the API accepts
+the message and the handset never rings, which is the worst failure shape there
+is, and it cost a day before the Twilio console's message logs made it visible.
+If this ever stops working, start there rather than in the code: `30034` means
+the number is not registered against an approved campaign, `30007` means a
+carrier filtered it, `21610` means that person replied STOP.
 
-What the app does in the meantime: `smsAvailable()` requires all three Twilio
-variables, and the planner hides the button entirely rather than offering one
-that cannot work.
+Two rejections were worth writing down, because neither is about the code:
 
-The consent side is finished and is what the registration is built on:
+- A privacy policy can be public, complete and correct and still fail vetting
+  for its wording. "Never shared with third parties or affiliates" was refused;
+  "do not share, sell, or provide" passed. Vetting is pattern-matching, so
+  `src/lib/legal.ts` matches the pattern rather than reading better than it.
+- Naming your messaging provider without naming the relationship reads as a
+  disclosure of data sharing and contradicts the promise above it. "Twilio, our
+  messaging service provider, acting only to transmit messages on our behalf"
+  is doing real work in that sentence.
+
+The registration is a sole-proprietor Brand, which carries low daily throughput
+caps. A household and a weekly list is nowhere near them.
+
+The consent machinery is what the registration was built on, and it is the part
+that reads as over-engineering until a carrier asks to see it:
 
 - A number is only ever entered by its owner. `saveOwnPhone` writes the
   caller's own row and nothing else — a digit wrong sends the week's shopping
