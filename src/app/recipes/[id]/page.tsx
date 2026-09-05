@@ -55,7 +55,7 @@ export default async function RecipePage({
   return (
     <AppShell>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         sx={{
           alignItems: "flex-start",
           justifyContent: "space-between",
@@ -63,7 +63,25 @@ export default async function RecipePage({
           mb: 1,
         }}
       >
-        <Typography variant="h1">{recipe.title}</Typography>
+        {/*
+         * The title gets the whole width on a phone and the buttons drop
+         * below it. Sharing the row costs it about half the line, which a
+         * page label like "Pantry" can afford and a recipe title cannot.
+         */}
+        <Typography
+          variant="h1"
+          sx={{
+            /*
+             * Every other h1 is a page label the theme's 3rem step-down was
+             * measured against. This one is whatever the card was called, so
+             * it steps down once more rather than running to six lines.
+             */
+            fontSize: { xs: "2.125rem", sm: "4.75rem" },
+            overflowWrap: "break-word",
+          }}
+        >
+          {recipe.title}
+        </Typography>
         {/*
          * Everyone reads the library; only the household that added a recipe
          * can change it. The server enforces that either way.
