@@ -100,6 +100,7 @@ You need a Postgres instance. Anything works locally; production is Neon.
 | `BETTER_AUTH_SECRET`    | sessions              | `openssl rand -base64 32`                          |
 | `BETTER_AUTH_URL`       | sessions              | The app's own origin                               |
 | `ANTHROPIC_API_KEY`     | reading a card        | Without it, upload returns a clear 422             |
+| `UPLOAD_DAILY_LIMIT`    | capping the bill      | Cards per person per day. Unset means 30           |
 | `INSTACART_API_KEY`     | sending a cart        | Without it, the planner says so and stays usable   |
 | `INSTACART_API_BASE`    | sending a cart        | Dev server by default; switch for production       |
 | `BLOB_READ_WRITE_TOKEN` | uploads in production | Unset locally: files go to `public/uploads/`       |
@@ -210,6 +211,23 @@ to a handset, and that response is all the sender sees. So a send that is
 filtered downstream is reported as a success. Real delivery state needs a
 status-callback webhook, which does not exist yet; until it does, Twilio's
 Messaging logs are the only place the truth lives.
+
+**Reading a card is metered per person, per day.** It is the only operation
+here that costs money every time it runs, and `/api/upload` is reachable by
+anyone with an account - a theoretical problem for one household, and somebody
+else's enthusiasm arriving on your bill for thirty.
+
+The counter is a row per person per day in Postgres rather than anything new to
+run. It is claimed immediately before the model call and nowhere earlier: a
+duplicate file or a damaged one is refused for free and should not spend an
+allowance on a call that never happens. A refused attempt still increments, so
+hammering the endpoint cannot walk the count back into range.
+
+The ceiling is not there to shape how people add recipes - a household typing
+up twenty cards the evening they join should sail through it - only to stop a
+runaway loop being unbounded. `UPLOAD_DAILY_LIMIT` moves it; a value that is
+not a positive integer falls back to the default rather than becoming `NaN`,
+which would compare false against everything and quietly switch the limit off.
 
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
