@@ -68,18 +68,7 @@ export default async function RecipePage({
          * below it. Sharing the row costs it about half the line, which a
          * page label like "Pantry" can afford and a recipe title cannot.
          */}
-        <Typography
-          variant="h1"
-          sx={{
-            /*
-             * Every other h1 is a page label the theme's 3rem step-down was
-             * measured against. This one is whatever the card was called, so
-             * it steps down once more rather than running to six lines.
-             */
-            fontSize: { xs: "2.125rem", sm: "4.75rem" },
-            overflowWrap: "break-word",
-          }}
-        >
+        <Typography variant="h1" sx={{ overflowWrap: "break-word" }}>
           {recipe.title}
         </Typography>
         {/*
