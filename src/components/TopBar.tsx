@@ -56,11 +56,16 @@ export function TopBar({ userName }: { userName: string | null }) {
           display: "flex",
           alignItems: "center",
           gap: { xs: 2, md: 4.25 },
+          // Five destinations and a wordmark do not fit across 393px. On a
+          // phone the nav wraps to a row of its own rather than being squeezed
+          // into whatever is left, which was about one and a half words.
+          flexWrap: { xs: "wrap", md: "nowrap" },
+          rowGap: { xs: 1, md: 0 },
           width: "100%",
           maxWidth: PAGE_MAX_WIDTH,
           mx: "auto",
           px: PAGE_PADDING_X,
-          py: 2.5,
+          py: { xs: 2, md: 2.5 },
         }}
       >
         <Box
@@ -74,6 +79,7 @@ export function TopBar({ userName }: { userName: string | null }) {
             mr: { xs: 0, md: "14px" },
             flexShrink: 0,
             textDecoration: "none",
+            order: 1,
           }}
         >
           {/* A placeholder device, not a finished logo: a clay dot in a green
@@ -123,16 +129,28 @@ export function TopBar({ userName }: { userName: string | null }) {
             component="nav"
             sx={{
               display: "flex",
-              gap: "28px",
-              flex: 1,
-              // Five destinations do not fit across a phone. Scrolling the row
-              // keeps the bar one line tall, where wrapping would spend a
-              // second line of every screen on navigation. The scrollbar is
-              // hidden because the cut-off item is the affordance.
+              gap: { xs: "22px", md: "28px" },
+              // Second row on a phone, sharing row one at desktop. Wrapping
+              // costs about forty pixels and buys five reachable destinations
+              // instead of "Recipes" and a clipped T.
+              order: { xs: 3, md: 2 },
+              flexBasis: { xs: "100%", md: "auto" },
+              flex: { md: 1 },
               minWidth: 0,
               overflowX: "auto",
               scrollbarWidth: "none",
               "&::-webkit-scrollbar": { display: "none" },
+              // Even a full-width row does not hold five words, so the last one
+              // is faded rather than guillotined: a word cut mid-letter reads
+              // as a bug, a word fading out reads as more to the right.
+              maskImage: {
+                xs: "linear-gradient(to right, #000 88%, transparent)",
+                md: "none",
+              },
+              WebkitMaskImage: {
+                xs: "linear-gradient(to right, #000 88%, transparent)",
+                md: "none",
+              },
             }}
           >
             {navItems.map((item) => {
@@ -182,7 +200,12 @@ export function TopBar({ userName }: { userName: string | null }) {
           <Stack
             direction="row"
             spacing={{ xs: 2, md: 3.5 }}
-            sx={{ alignItems: "center", flexShrink: 0 }}
+            sx={{
+              alignItems: "center",
+              flexShrink: 0,
+              order: { xs: 2, md: 3 },
+              ml: { xs: "auto", md: 0 },
+            }}
           >
             <Box
               component="span"

@@ -51,11 +51,14 @@ export default async function RecipesPage({
       <Box
         sx={{
           display: "flex",
-          alignItems: "flex-end",
+          alignItems: { xs: "stretch", md: "flex-end" },
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 4,
-          mb: "36px",
+          // On a phone the title and the controls stack, and a 32px gap
+          // between them was buying nothing but scrolling: the whole header
+          // ran to 500px on an 852px screen before a single dish appeared.
+          gap: { xs: 1.5, md: 4 },
+          mb: { xs: "20px", md: "36px" },
         }}
       >
         <Box>
@@ -77,7 +80,15 @@ export default async function RecipesPage({
 
         <Stack
           direction="row"
-          sx={{ alignItems: "center", gap: "18px", pb: "8px" }}
+          sx={{
+            alignItems: "center",
+            // Filters and New recipe share the row width on a phone rather
+            // than huddling at the left with a hole beside them.
+            justifyContent: { xs: "space-between", md: "flex-start" },
+            width: { xs: "100%", md: "auto" },
+            gap: "18px",
+            pb: { xs: 0, md: "8px" },
+          }}
         >
           <RecipeFilters tags={tags} />
           <LinkButton href="/recipes/new" variant="contained" color="ink">

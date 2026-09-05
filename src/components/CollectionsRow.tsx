@@ -40,14 +40,25 @@ export function CollectionsRow({ collections }: { collections: TagCount[] }) {
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: "26px",
-        mb: "56px",
+        gap: { xs: "20px", md: "26px" },
+        mb: { xs: "28px", md: "56px" },
         // Six serif words do not fit across a phone. Scrolling the row keeps
         // them on one line, where wrapping would spend three lines on shelf
-        // labels; the cut-off item is the affordance.
+        // labels.
         overflowX: { xs: "auto", md: "visible" },
         scrollbarWidth: "none",
         "&::-webkit-scrollbar": { display: "none" },
+        // The last name fades out instead of being cut mid-letter. "Sunday
+        // Cook" with the rule running off the edge reads as a layout fault;
+        // the same word fading reads as a row that continues.
+        maskImage: {
+          xs: "linear-gradient(to right, #000 90%, transparent)",
+          md: "none",
+        },
+        WebkitMaskImage: {
+          xs: "linear-gradient(to right, #000 90%, transparent)",
+          md: "none",
+        },
         "& > *": { flexShrink: 0 },
       }}
     >
