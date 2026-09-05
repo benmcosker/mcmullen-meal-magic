@@ -4,6 +4,8 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import InputBase from "@mui/material/InputBase";
 import Menu from "@mui/material/Menu";
+import type { Theme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuItem from "@mui/material/MenuItem";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -28,6 +30,19 @@ export function RecipeSearchBar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  /**
+   * A phone cannot hold the long invitation and the sort control on one line,
+   * and letting it truncate produces "What are you in the mood f" - which was
+   * tried, and reads as a bug rather than as a shortened phrase. The short
+   * form says the same thing.
+   *
+   * Resolved after mount rather than with `noSsr`. The server has no viewport,
+   * so `noSsr` makes the client's first render disagree with the HTML it is
+   * hydrating - a real mismatch, spent on a placeholder. This way the first
+   * paint carries the long string and a phone swaps it a frame later.
+   */
+  const compact = useMediaQuery((theme: Theme) => theme.breakpoints.down("sm"));
 
   const sort = (searchParams.get("sort") ?? "newest") as RecipeSort;
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
@@ -66,11 +81,7 @@ export function RecipeSearchBar() {
       sx={{
         display: "flex",
         alignItems: "center",
-        // On a phone the invitation and the sort control do not both fit, and
-        // "What are you in the mood" cut off mid-phrase reads as broken rather
-        // than as truncated. Wrapping puts the sort on a second line under the
-        // same rule instead.
-        flexWrap: { xs: "wrap", sm: "nowrap" },
+        flexWrap: "nowrap",
         columnGap: 1.5,
         rowGap: 1,
         // The emphatic rule rather than the hairline: this one separates the
@@ -84,14 +95,15 @@ export function RecipeSearchBar() {
       <InputBase
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="What are you in the mood for?"
+        placeholder={
+          compact ? "In the mood for?" : "What are you in the mood for?"
+        }
         // The placeholder says what the field is for, and a visible label above
         // it would undo the treatment.
         inputProps={{ "aria-label": "Search recipes" }}
         sx={{
           flex: 1,
           minWidth: 0,
-          flexBasis: { xs: "100%", sm: "auto" },
           // Serif, taken from the variant rather than a restated font stack.
           fontFamily: (theme) => theme.typography.body1.fontFamily,
           fontSize: { xs: "1.25rem", md: "1.625rem" },
@@ -112,7 +124,6 @@ export function RecipeSearchBar() {
         sx={{
           flexShrink: 0,
           whiteSpace: "nowrap",
-          ml: { xs: "auto", sm: 0 },
         }}
       >
         {sortLabel} ↓
