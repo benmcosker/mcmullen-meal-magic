@@ -75,6 +75,7 @@ model User {
   pantryItems  PantryItem[]
   weeklySkips  WeeklySkip[]
   reviews      RecipeReview[]
+  uploadQuotas UploadQuota[]
 
   @@unique([email])
   @@index([householdId])
@@ -500,4 +501,28 @@ model ShoppingHandoff {
   @@index([householdId, weekStart])
   @@index([createdById])
   @@map("shopping_handoff")
+}
+
+/// How many recipe cards one person has sent to the model today.
+///
+/// Reading a card is the one thing this app does that costs money per use, and
+/// the upload endpoint is reachable by anyone with an account. One row per
+/// person per day is enough to put a ceiling on that without any new
+/// infrastructure - a counter in Postgres, which the app already has, rather
+/// than a Redis nobody has to run.
+///
+/// Counted per user rather than per household: a household is a group of
+/// people who trust each other, and a shared ceiling would let one of them
+/// spend the others' allowance.
+model UploadQuota {
+  /// Midnight UTC on the day being counted. A date rather than a timestamp,
+  /// so the row is the counter and there is nothing to sum.
+  day    DateTime @db.Date
+  count  Int      @default(0)
+
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+  @@map("upload_quota")
 }

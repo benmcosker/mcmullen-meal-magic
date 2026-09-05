@@ -12,6 +12,7 @@ import {
   MAX_CARD_IMAGE_BYTES,
 } from "@/lib/extract-recipe";
 import { inspectImage, type SupportedImageType } from "@/lib/image-inspect";
+import { claimUploadSlot } from "@/lib/upload-quota";
 import { extractLargestJpeg } from "@/lib/pdf-images";
 import { inspectPdf } from "@/lib/pdf-inspect";
 import { blobStoreId, storeFile } from "@/lib/storage";
@@ -143,6 +144,24 @@ async function handleUpload(request: Request) {
         duplicateOf: alreadyHave,
       },
       { status: 409 },
+    );
+  }
+
+  // Metered here and nowhere earlier: everything above this line is free, and
+  // a duplicate or a damaged file should not spend somebody's allowance on a
+  // call that never happens.
+  const slot = await claimUploadSlot(user.id);
+  if (!slot.ok) {
+    return NextResponse.json(
+      {
+        error:
+          `That is ${slot.limit} cards read today, which is the daily limit. ` +
+          `It resets at midnight UTC; recipes can still be typed in.`,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(slot.retryAfterSeconds) },
+      },
     );
   }
 
