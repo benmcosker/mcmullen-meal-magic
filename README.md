@@ -157,6 +157,51 @@ schema is present.
 The integration tests share one database and clean up after themselves, which
 means running them against a database you care about will empty it.
 
+## Not built yet
+
+Two changes are agreed in shape and not started. The reasoning is written down
+here because it is worth more than the ticket would be.
+
+**A hybrid library.** Every recipe is visible to every signed-in user, which is
+right for one household and wrong for several. The intended end state is
+private by default with explicit sharing, and four questions decide the schema
+before any of it is written:
+
+- Is a recipe shared one at a time, or is a whole box shared with someone?
+- What does sharing do to ratings? One average that follows the recipe
+  everywhere says something different from each household rating its own copy,
+  and only one of those keeps "how many people liked this" meaningful.
+- Can another household plan your recipe, and is what lands on their week a
+  reference or a copy? A reference means your later edits reach a meal they
+  have already planned; a copy means the recipe stops changing the moment they
+  take it.
+- Do shared recipes mix into the library with a marker, or live in a view of
+  their own?
+
+None of these has an obvious answer and each one picks a different set of
+tables. `Recipe.sourceFileSha256` belongs in the same change, for the reason
+under the shared library below.
+
+**An admin view, at the meta level only.** A list of people, whether they have
+used the planner, and uploads by household - no recipes, no plans, no list
+contents. The narrow scope is the point. A role that could read household
+content would falsify the sentence in the live privacy policy saying recipes
+and plans are visible to the members of the same household, and would turn
+household isolation from something the code guarantees into something an
+administrator is trusted to respect.
+
+Scoped that way it needs no new tracking. `PlannedMeal.createdAt` answers
+planner use, `Recipe.source` splits typed cards from PDFs and photographs,
+`UploadQuota` already counts upload attempts, and `Session.createdAt` gives a
+last sign-in - with the caveat that expired sessions are cleaned up, so silence
+there reads as "not lately" rather than "never". Whether a household texts its
+list is the one thing recorded nowhere: `textShoppingList` writes no row.
+
+Access belongs in an `ADMIN_EMAILS` environment variable rather than a column
+on the user: nobody can grant themselves the role through the app, and revoking
+it is a deploy rather than a database edit. The route should answer 404 rather
+than 403, so its existence is not advertised to people who cannot use it.
+
 ## Notes and limitations
 
 **Texting works, and getting there was most of the work.** The sender itself is
@@ -228,6 +273,15 @@ up twenty cards the evening they join should sail through it - only to stop a
 runaway loop being unbounded. `UPLOAD_DAILY_LIMIT` moves it; a value that is
 not a positive integer falls back to the default rather than becoming `NaN`,
 which would compare false against everything and quietly switch the limit off.
+
+**The shared library has two edges sharper than the sharing itself.** That
+every recipe is visible to everybody is deliberate and stated above; two
+smaller things inherit it and are easier to miss. `Recipe.sourceFileSha256` is
+unique across the whole table with no household in the lookup, so the second
+household to upload a widely printed card is told it duplicates one they cannot
+see. `Tag.name` and `Tag.slug` are globally unique too, so tag vocabulary is
+shared whether or not the recipes are. Both are fine for one household, and
+both want settling alongside the hybrid library rather than before it.
 
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
@@ -321,6 +375,24 @@ is kept as the source card and the recipe starts with no dish photo.
 **Unit merging is conservative.** Synonyms fold together (`tablespoons` →
 `tbsp`), but nothing converts between units — 1 cup and 200 ml stay as two
 lines. A silently wrong conversion is worse than a slightly longer list.
+
+**A function cannot cross from a server component into MUI's client code.**
+This cost time three separate times and it does not look like a mistake going
+in: `component={Link}`, an `sx` callback, and an `onChange` passed down from a
+server page all typecheck, build cleanly and serve `200`. They fail when React
+hydrates, which `npm run build` never exercises - so a green build says nothing
+at all about this class of bug.
+
+`FormControlLabel` is the sharpest instance, because it reads `control.props`
+during render and an element that crossed the boundary has none. The fixes are
+to mark the component `"use client"` - `SmsDisclosure` carries the directive
+because it must, not for tidiness - or to make the callback optional, so a
+server page can render an inert control without passing a function at all. A
+page that renders MUI wants opening in a browser before you believe it works.
+
+**The dark colour scheme has never been reviewed.** It follows the system
+setting through MUI's `colorSchemeSelector: "media"` and has only been seen in
+passing. Nothing suggests it is broken; nothing has checked it either.
 
 **Restart the dev server after a schema change** — after pulling a branch that
 adds a model, too. `npm run dev` and `npm run db:deploy` both regenerate the
