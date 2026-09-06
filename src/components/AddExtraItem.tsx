@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
@@ -48,9 +49,16 @@ export function AddExtraItem({ weekStartIso }: { weekStartIso: string }) {
 
   return (
     <Box component="form" onSubmit={add} sx={{ mb: 2 }}>
+      <Typography
+        variant="overline"
+        color="text.secondary"
+        sx={{ display: "block", mb: 0.5 }}
+      >
+        Anything else you need
+      </Typography>
       <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
         <TextField
-          label="Add an item"
+          label="Item"
           placeholder="Kitchen roll"
           size="small"
           value={name}
@@ -68,12 +76,17 @@ export function AddExtraItem({ weekStartIso }: { weekStartIso: string }) {
           // Wide enough for "a big bag" without taking the room the name needs.
           sx={{ width: { xs: 96, sm: 128 }, flexShrink: 0 }}
         />
+        {/*
+         * Filled rather than outlined. Outlined in this theme is a muted
+         * border on the page colour, which beside two text fields of the same
+         * height reads as a third empty box rather than as the button.
+         */}
         <Button
           type="submit"
-          variant="outlined"
+          variant="contained"
           disabled={pending || !name.trim()}
           // Matches the height of the small fields beside it.
-          sx={{ flexShrink: 0, height: 40 }}
+          sx={{ flexShrink: 0, height: 40, px: 2.5 }}
         >
           Add
         </Button>
