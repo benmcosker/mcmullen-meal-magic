@@ -1,13 +1,6 @@
 import { prisma } from "../db";
-import { listExtraItems, withExtras } from "../extras";
-import {
-  aggregateIngredients,
-  buildExclusions,
-  getWeekPlan,
-  getWeeklySkips,
-} from "../grocery";
-import { listPantryItems } from "../pantry";
 import { formatAsPlainText } from "../shopping/format";
+import { weekShoppingList } from "../week-list";
 import { getSender, smsAvailable } from "./index";
 import { TWILIO_UNSUBSCRIBED } from "./twilio";
 import { shoppingListMessage, splitMessage } from "./message";
@@ -120,17 +113,7 @@ export async function textShoppingList(params: {
     return { ok: false, error: "Texting is not set up for this deployment." };
   }
 
-  const [meals, pantry, skips, extras] = await Promise.all([
-    getWeekPlan(params.weekStart, params.householdId),
-    listPantryItems(params.householdId),
-    getWeeklySkips(params.weekStart, params.householdId),
-    listExtraItems(params.weekStart, params.householdId),
-  ]);
-
-  const lines = withExtras(
-    aggregateIngredients(meals, buildExclusions(pantry, skips)),
-    extras,
-  );
+  const lines = await weekShoppingList(params.weekStart, params.householdId);
   if (lines.length === 0) {
     return {
       ok: false,

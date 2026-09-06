@@ -3,16 +3,15 @@ import Typography from "@mui/material/Typography";
 import { AppShell } from "@/components/AppShell";
 import { WeekPlanner } from "@/components/WeekPlanner";
 import { prisma } from "@/lib/db";
-import { listExtraItems, withExtras } from "@/lib/extras";
+import { listExtraItems } from "@/lib/extras";
 import {
   addDays,
-  aggregateIngredients,
   getWeekPlan,
   getWeeklySkips,
-  buildExclusions,
   weekStartOf,
 } from "@/lib/grocery";
 import { listPantryItems } from "@/lib/pantry";
+import { buildShoppingList } from "@/lib/week-list";
 import { NO_REVIEWS } from "@/lib/review-schema";
 import { getReviewSummaries } from "@/lib/reviews";
 import { listUsableProviders } from "@/lib/shopping";
@@ -49,10 +48,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   // to see which of these the household actually liked.
   const summaries = await getReviewSummaries(recipes.map((r) => r.id));
 
-  const groceries = withExtras(
-    aggregateIngredients(meals, buildExclusions(pantry, skips)),
-    extras,
-  );
+  const groceries = buildShoppingList({ meals, pantry, skips, extras });
 
   return (
     <AppShell>
