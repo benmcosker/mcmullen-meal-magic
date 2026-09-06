@@ -10,14 +10,47 @@ import { prisma } from "./db";
  *
  * Compared case-insensitively, because an email address is typed by a person
  * and "Ben@" and "ben@" are the same inbox.
+ *
+ * Surrounding quotes are stripped for the same reason. A .env file wants
+ * ADMIN_EMAILS="ben@example.com" and a hosting dashboard wants the bare
+ * address, so the quoted form gets pasted into the dashboard and the value
+ * arrives with literal quote characters in it. Nothing then matches, and the
+ * page 404s exactly as it would for a stranger - which is the least
+ * debuggable way this can fail.
  */
 export function adminEmails(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return (env.ADMIN_EMAILS ?? "")
+  const raw = (env.ADMIN_EMAILS ?? "").trim();
+
+  /*
+   * Unwrap the whole value only when its quotes are the only pair in it.
+   * `"a@x.com, b@x.com"` is one wrapped list and unwraps; `"a@x.com","b@x.com"`
+   * is two quoted entries, and unwrapping that leaves a stray quote glued to
+   * each address - so it is left for the per-entry pass below instead.
+   */
+  const pairs = (raw.match(/["']/g) ?? []).length;
+  const source = pairs === 2 ? unquote(raw) : raw;
+
+  return source
     .split(",")
-    .map((entry) => entry.trim().toLowerCase())
+    .map((entry) => unquote(entry).toLowerCase())
     .filter(Boolean);
+}
+
+/**
+ * Drop one matched pair of surrounding quotes, if there is one.
+ *
+ * An unbalanced quote is left alone: half a quote is a typo, and stripping it
+ * would invent an address nobody typed.
+ */
+function unquote(value: string): string {
+  const trimmed = value.trim();
+  const quoted =
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")));
+  return quoted ? trimmed.slice(1, -1).trim() : trimmed;
 }
 
 export function isAdmin(
