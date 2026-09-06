@@ -316,6 +316,19 @@ The list is week-scoped, like the plan and unlike the pantry. Next week starts
 empty, which is right for kitchen roll and wrong for salt; salt is what the
 pantry is for.
 
+**The week's list is assembled in one place, and was not always.** Three
+things need it and none of them may disagree: the planner renders it, the shop
+hand-off sends it, and the text message is read from it in the aisle. They did
+disagree. The hand-off built its lines without exclusions, so a pantry staple
+you never buy and a line you had already ticked off both went to Amazon anyway,
+while the same week texted correctly - and nothing announced it, because a
+shopping list with two extra things on it looks exactly like a shopping list.
+
+`buildShoppingList` in `src/lib/week-list.ts` is now the only assembly, and the
+order in it is the whole point: exclusions apply to what the recipes asked for,
+and hand-added items go on afterwards. A fourth caller gets the same list by
+construction rather than by remembering to.
+
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
 integration surface — nothing after the hand-off is visible to this app.

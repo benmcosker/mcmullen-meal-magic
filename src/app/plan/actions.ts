@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
-import { listExtraItems, withExtras } from "@/lib/extras";
-import { aggregateIngredients, getWeekPlan, weekStartOf } from "@/lib/grocery";
+import { weekStartOf } from "@/lib/grocery";
+import { weekShoppingList } from "@/lib/week-list";
 import { getProvider, type HandoffResult } from "@/lib/shopping";
 import { createRecipe } from "@/lib/recipe-mutations";
 import { recipeInput } from "@/lib/recipe-schema";
@@ -74,11 +74,7 @@ export async function sendWeekToProviderAction(
   const user = await requireHousehold();
 
   const weekStart = weekStartOf(new Date(weekStartIso));
-  const [meals, extras] = await Promise.all([
-    getWeekPlan(weekStart, user.householdId),
-    listExtraItems(weekStart, user.householdId),
-  ]);
-  const lines = withExtras(aggregateIngredients(meals), extras);
+  const lines = await weekShoppingList(weekStart, user.householdId);
 
   if (lines.length === 0) {
     return {
