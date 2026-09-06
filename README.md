@@ -60,6 +60,9 @@ striped placeholders are what the app draws when a recipe has none.
 - **Grocery list.** Ingredients roll up across the week's meals, scaled to the
   servings planned and merged where names and units agree. Pantry staples and
   anything ticked off for the week drop out before the merge.
+- **Anything else you need.** Kitchen roll, dish soap, a birthday cake - things
+  no recipe asks for go on the week's list by hand, sorted into the aisle
+  they'll be found in, and travel with it to the shop hand-off and the text.
 - **Shopping hand-off.** Send the week's list to Amazon Fresh or Whole Foods (a
   search link per ingredient plus a copyable list). An Instacart provider that
   builds a real cart is written and tested but hidden until a key exists — see
@@ -282,6 +285,36 @@ household to upload a widely printed card is told it duplicates one they cannot
 see. `Tag.name` and `Tag.slug` are globally unique too, so tag vocabulary is
 shared whether or not the recipes are. Both are fine for one household, and
 both want settling alongside the hybrid library rather than before it.
+
+**A hand-added item is not an ingredient, and the list treats it as one
+anyway.** Kitchen roll has to be on the list you walk round the shop with, so
+it lives in the same lines, sorts into the same aisles, and reaches the
+hand-off and the text message by the same route. Three things follow from
+that, and each was a choice.
+
+The amount is free text. "A big bag" is a real answer to how much, and nothing
+scales or totals a hand-added line, so nothing needs it to parse. That is also
+why such a line sits beside a recipe's rather than merging into it: there is no
+number to add, and one line could not say how much of the milk was somebody's
+own idea.
+
+It is asked for in its own field rather than read out of the name. Splitting
+"2 lemons" into a number and a noun works until somebody types "7 Up".
+
+The row offers Remove where a recipe's offers "Got it" and "Always have". Both
+of those work by hiding something a recipe asked for; neither can hide
+something you asked for yourself, and a pantry staple that quietly removed a
+line you had just typed would be the worst of the three.
+
+Hand-added items also needed an aisle of their own. Nothing non-food could
+reach the list before, so `sectionFor` had no Household section and sent
+kitchen roll to the bakery - it matched "roll". The phrases in that section are
+nearly all multi-word for the same reason, since a bare "roll", "paper" or
+"bag" has to keep meaning what a recipe means by it.
+
+The list is week-scoped, like the plan and unlike the pantry. Next week starts
+empty, which is right for kitchen roll and wrong for salt; salt is what the
+pantry is for.
 
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire

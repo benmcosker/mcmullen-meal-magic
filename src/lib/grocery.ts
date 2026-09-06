@@ -4,9 +4,19 @@ export type GroceryLine = {
   name: string;
   quantity: number | null;
   unit: string | null;
-  /** Titles of the recipes that contributed to this line. */
+  /** Titles of the recipes that contributed to this line. Empty when none did. */
   fromRecipes: string[];
   recipeId: string | null;
+  /**
+   * Set when the line was typed onto the week by hand rather than coming from
+   * a recipe. Carries the id so the row can offer to take it off again.
+   */
+  extraId?: string | null;
+  /**
+   * A hand-written amount, shown exactly as typed in place of quantity and
+   * unit. Free text on purpose: "a big bag" is a real answer to how much.
+   */
+  amountLabel?: string | null;
 };
 
 /** Monday 00:00 UTC of the week containing `date`. */

@@ -1,4 +1,5 @@
 import { prisma } from "../db";
+import { listExtraItems, withExtras } from "../extras";
 import {
   aggregateIngredients,
   buildExclusions,
@@ -119,17 +120,21 @@ export async function textShoppingList(params: {
     return { ok: false, error: "Texting is not set up for this deployment." };
   }
 
-  const [meals, pantry, skips] = await Promise.all([
+  const [meals, pantry, skips, extras] = await Promise.all([
     getWeekPlan(params.weekStart, params.householdId),
     listPantryItems(params.householdId),
     getWeeklySkips(params.weekStart, params.householdId),
+    listExtraItems(params.weekStart, params.householdId),
   ]);
 
-  const lines = aggregateIngredients(meals, buildExclusions(pantry, skips));
+  const lines = withExtras(
+    aggregateIngredients(meals, buildExclusions(pantry, skips)),
+    extras,
+  );
   if (lines.length === 0) {
     return {
       ok: false,
-      error: "Nothing planned this week, so there is nothing to send.",
+      error: "Nothing on the list this week, so there is nothing to send.",
     };
   }
 

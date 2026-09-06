@@ -3,6 +3,7 @@ import Typography from "@mui/material/Typography";
 import { AppShell } from "@/components/AppShell";
 import { WeekPlanner } from "@/components/WeekPlanner";
 import { prisma } from "@/lib/db";
+import { listExtraItems, withExtras } from "@/lib/extras";
 import {
   addDays,
   aggregateIngredients,
@@ -28,7 +29,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     weekParam ? new Date(`${weekParam}T00:00:00.000Z`) : new Date(),
   );
 
-  const [meals, recipes, skips, pantry] = await Promise.all([
+  const [meals, recipes, skips, pantry, extras] = await Promise.all([
     getWeekPlan(weekStart, householdId),
     prisma.recipe.findMany({
       select: { id: true, title: true, servings: true, imageUrl: true },
@@ -36,6 +37,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     }),
     getWeeklySkips(weekStart, householdId),
     listPantryItems(householdId),
+    listExtraItems(weekStart, householdId),
   ]);
 
   // Who a text would actually reach. Fetched even when texting is switched off
@@ -47,7 +49,10 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   // to see which of these the household actually liked.
   const summaries = await getReviewSummaries(recipes.map((r) => r.id));
 
-  const groceries = aggregateIngredients(meals, buildExclusions(pantry, skips));
+  const groceries = withExtras(
+    aggregateIngredients(meals, buildExclusions(pantry, skips)),
+    extras,
+  );
 
   return (
     <AppShell>

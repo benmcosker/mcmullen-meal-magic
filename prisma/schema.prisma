@@ -27,24 +27,25 @@ model Household {
   meals    PlannedMeal[]
   pantry   PantryItem[]
   skips    WeeklySkip[]
+  extras   ExtraItem[]
   handoffs ShoppingHandoff[]
 
   @@map("household")
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
+  id               String            @id
+  name             String
+  email            String
+  emailVerified    Boolean           @default(false)
+  image            String?
   /// E.164, or null for somebody who has not given one.
   ///
   /// Optional because it only buys one thing - having the week's shopping
   /// texted to you - and an account is perfectly usable without it. Not unique:
   /// a household sharing one handset is odd but not wrong, and a unique index
   /// would turn that into an error message nobody could act on.
-  phone         String?
+  phone            String?
   /// When this person agreed to be texted, or null if they never have.
   ///
   /// Separate from `phone` on purpose - see SmsConsentSource. Nulled alongside
@@ -52,10 +53,10 @@ model User {
   /// withdrawal rather than a number the app has merely misplaced.
   smsConsentAt     DateTime?
   smsConsentSource SmsConsentSource?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  sessions         Session[]
+  accounts         Account[]
 
   /// Which family this login belongs to. Exactly one - several logins share a
   /// household, not the reverse.
@@ -74,6 +75,7 @@ model User {
   shoppingRuns ShoppingHandoff[]
   pantryItems  PantryItem[]
   weeklySkips  WeeklySkip[]
+  extraItems   ExtraItem[]
   reviews      RecipeReview[]
   uploadQuotas UploadQuota[]
 
@@ -451,6 +453,37 @@ model PantryItem {
   @@map("pantry_item")
 }
 
+/// Something to buy that no recipe asked for: kitchen roll, a birthday cake,
+/// more coffee.
+///
+/// Scoped to a week like the plan itself, not kept forever like the pantry.
+/// The two lists are opposites - the pantry is what you never have to buy, and
+/// this is what you have to buy this once - so neither belongs in the other.
+model ExtraItem {
+  id             String   @id @default(cuid())
+  /// As typed, and shown back as typed.
+  name           String
+  /// Free text, because a hand-written amount is often not a number: "2",
+  /// "500g", "a big bag". Nothing scales or merges it, so nothing needs it to
+  /// parse.
+  amount         String?
+  /// Matched the same way ingredient names are, so adding a thing twice in a
+  /// week is recognised as the same thing.
+  normalisedName String
+  weekStart      DateTime @db.Date
+  createdAt      DateTime @default(now())
+
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, normalisedName, weekStart])
+  @@index([createdById])
+  @@map("extra_item")
+}
+
 /// "We already have milk, do not put it on this week's list."
 ///
 /// Distinct from the pantry: this expires. Next week milk is back on the list,
@@ -517,11 +550,11 @@ model ShoppingHandoff {
 model UploadQuota {
   /// Midnight UTC on the day being counted. A date rather than a timestamp,
   /// so the row is the counter and there is nothing to sum.
-  day    DateTime @db.Date
-  count  Int      @default(0)
+  day   DateTime @db.Date
+  count Int      @default(0)
 
   userId String
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, day])
   @@map("upload_quota")
