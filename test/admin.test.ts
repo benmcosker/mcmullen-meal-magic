@@ -34,6 +34,29 @@ describe("who is an admin", () => {
     expect(isAdmin("   ", env("ben@example.com"))).toBe(false);
   });
 
+  /*
+   * .env wants ADMIN_EMAILS="ben@example.com"; a hosting dashboard wants the
+   * bare address. The quoted form gets pasted into the dashboard, and without
+   * this the page 404s exactly as it would for a stranger.
+   */
+  it("survives the quotes coming along from a .env line", () => {
+    expect(isAdmin("ben@example.com", env('"ben@example.com"'))).toBe(true);
+    expect(isAdmin("ben@example.com", env("'ben@example.com'"))).toBe(true);
+    expect(
+      isAdmin("laura@example.com", env('"ben@example.com, laura@example.com"')),
+    ).toBe(true);
+    expect(adminEmails(env('"a@example.com","b@example.com"'))).toEqual([
+      "a@example.com",
+      "b@example.com",
+    ]);
+  });
+
+  it("leaves an unbalanced quote alone rather than guessing", () => {
+    // Half a quote is a typo, not a wrapper; stripping it would invent an
+    // address nobody typed.
+    expect(adminEmails(env('"ben@example.com'))).toEqual(['"ben@example.com']);
+  });
+
   it("does not match on a prefix or a lookalike domain", () => {
     const list = env("ben@example.com");
     expect(isAdmin("ben@example.com.evil.test", list)).toBe(false);

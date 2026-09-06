@@ -6,7 +6,12 @@ import Typography from "@mui/material/Typography";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/AppShell";
-import { adminOverview, isAdmin, type AdminHousehold } from "@/lib/admin";
+import {
+  adminEmails,
+  adminOverview,
+  isAdmin,
+  type AdminHousehold,
+} from "@/lib/admin";
 import { requireUser } from "@/lib/session";
 
 /** "2026-09-06", or a word when there is no date. */
@@ -133,7 +138,19 @@ function HouseholdCard({ household }: { household: AdminHousehold }) {
  */
 export default async function AdminPage() {
   const user = await requireUser();
-  if (!isAdmin(user.email)) notFound();
+  if (!isAdmin(user.email)) {
+    /*
+     * A 404 is the right answer and a terrible symptom: it looks identical
+     * whether the variable never reached the runtime or simply does not list
+     * this address. The count separates those two in the server log without
+     * putting anybody's address in it - "0 configured" is a deploy problem,
+     * "1 configured" is a mismatch between the value and the account.
+     */
+    console.warn(
+      `[admin] refused: ${adminEmails().length} address(es) configured`,
+    );
+    notFound();
+  }
 
   const households = await adminOverview();
   const people = households.reduce((n, h) => n + h.members.length, 0);
