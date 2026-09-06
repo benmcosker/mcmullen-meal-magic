@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { adminOverview, adminEmails, isAdmin } from "@/lib/admin";
+import { adminOverview, adminEmails, isAdmin, maskAddress } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 
 import { makeHousehold, makeUser, resetDatabase as reset } from "./support/db";
@@ -57,11 +57,41 @@ describe("who is an admin", () => {
     expect(adminEmails(env('"ben@example.com'))).toEqual(['"ben@example.com']);
   });
 
+  /*
+   * Invisible characters survive a copy out of a chat window or a password
+   * manager and are invisible in every field that will show them, so an
+   * address carrying one looks exactly right and matches nothing.
+   */
+  it("ignores zero-width characters on either side", () => {
+    expect(isAdmin("ben@example.com", env("ben@example.com\u200B"))).toBe(true);
+    expect(isAdmin("ben@example.com", env("\uFEFFben@example.com"))).toBe(true);
+    expect(isAdmin("ben\u200D@example.com", env("ben@example.com"))).toBe(true);
+  });
+
   it("does not match on a prefix or a lookalike domain", () => {
     const list = env("ben@example.com");
     expect(isAdmin("ben@example.com.evil.test", list)).toBe(false);
     expect(isAdmin("ben@example.co", list)).toBe(false);
     expect(isAdmin("notben@example.com", list)).toBe(false);
+  });
+});
+
+describe("what a refusal may say out loud", () => {
+  it("keeps the domain and the length, and hides the person", () => {
+    expect(maskAddress("benmcosker@gmail.com")).toBe(
+      "be********@gmail.com (20 chars)",
+    );
+  });
+
+  it("shows a length that disagrees when something invisible is in there", () => {
+    // The point of the length: these two look identical in any dashboard.
+    expect(maskAddress("ben@example.com")).not.toBe(
+      maskAddress("ben@example.com\u200B"),
+    );
+  });
+
+  it("says so rather than throwing on something that is not an address", () => {
+    expect(maskAddress("nonsense")).toBe("no... (8 chars, no @)");
   });
 });
 
