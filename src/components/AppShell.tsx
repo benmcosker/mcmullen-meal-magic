@@ -1,6 +1,7 @@
 import Box from "@mui/material/Box";
 import type { ReactNode } from "react";
 
+import { isAdmin } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/session";
 import { PAGE_MAX_WIDTH, PAGE_PADDING_X } from "@/theme/page";
 
@@ -12,7 +13,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-      <TopBar userName={user?.name ?? null} />
+      <TopBar userName={user?.name ?? null} isAdmin={isAdmin(user?.email)} />
       {/*
        * A plain Box rather than a Container. Container's `maxWidth="lg"` is
        * 1200px with 24px gutters, which put the page title 120px in from a

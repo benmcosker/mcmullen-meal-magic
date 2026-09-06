@@ -19,6 +19,9 @@ const navItems = [
   { href: "/household", label: "Household" },
 ] as const;
 
+/** Only ever shown to somebody the server has already decided is an admin. */
+const adminNavItem = { href: "/admin", label: "Activity" } as const;
+
 /** Karla, small, wide and uppercase - the register the whole chrome speaks in. */
 const chromeText = {
   fontFamily: fonts.sans,
@@ -32,10 +35,24 @@ const chromeText = {
  * function as a prop, which a server component cannot send across the RSC
  * boundary. Only the serialisable parts of the user are handed in.
  */
-export function TopBar({ userName }: { userName: string | null }) {
+export function TopBar({
+  userName,
+  isAdmin = false,
+}: {
+  userName: string | null;
+  isAdmin?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
+
+  /*
+   * The link is a convenience for the one person who has the page, not the
+   * thing that grants it. `/admin` decides for itself on every request and
+   * still answers 404 to anybody else, so a stale or forged `isAdmin` here
+   * shows a link that leads nowhere rather than opening anything.
+   */
+  const items = isAdmin ? [...navItems, adminNavItem] : navItems;
 
   return (
     <Box
@@ -153,7 +170,7 @@ export function TopBar({ userName }: { userName: string | null }) {
               },
             }}
           >
-            {navItems.map((item) => {
+            {items.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
