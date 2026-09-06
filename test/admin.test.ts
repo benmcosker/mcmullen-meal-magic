@@ -62,10 +62,29 @@ describe("who is an admin", () => {
    * manager and are invisible in every field that will show them, so an
    * address carrying one looks exactly right and matches nothing.
    */
-  it("ignores zero-width characters on either side", () => {
+  it("forgives a zero-width character in the value an operator typed", () => {
     expect(isAdmin("ben@example.com", env("ben@example.com\u200B"))).toBe(true);
     expect(isAdmin("ben@example.com", env("\uFEFFben@example.com"))).toBe(true);
-    expect(isAdmin("ben\u200D@example.com", env("ben@example.com"))).toBe(true);
+  });
+
+  /*
+   * The other direction is not forgiven, and the asymmetry is the point. An
+   * address that merely folds into the admin's is not the admin's: the unique
+   * index will hold "ben<zero-width>@example.com" alongside the real one, and
+   * stripping here would let that account in. Invite-only signup makes it
+   * narrow, not safe.
+   */
+  it("does not let an address that folds into the admin's be the admin", () => {
+    expect(isAdmin("ben\u200D@example.com", env("ben@example.com"))).toBe(
+      false,
+    );
+    expect(isAdmin("ben@exa\u200Bmple.com", env("ben@example.com"))).toBe(
+      false,
+    );
+    // A leading or trailing U+FEFF is folded by String.prototype.trim itself,
+    // so it is not this function's to refuse - which is why the cases above
+    // put the character inside the address, where trim cannot reach it.
+    expect(isAdmin("\uFEFFben@example.com", env("ben@example.com"))).toBe(true);
   });
 
   it("does not match on a prefix or a lookalike domain", () => {
