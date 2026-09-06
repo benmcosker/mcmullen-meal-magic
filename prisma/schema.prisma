@@ -29,6 +29,7 @@ model Household {
   skips    WeeklySkip[]
   extras   ExtraItem[]
   handoffs ShoppingHandoff[]
+  texts    ShoppingText[]
 
   @@map("household")
 }
@@ -69,15 +70,16 @@ model User {
   householdId String?
   household   Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
-  recipes      Recipe[]
-  invitesSent  Invite[]          @relation("InviteSender")
-  inviteUsed   Invite?           @relation("InviteRedeemer")
-  shoppingRuns ShoppingHandoff[]
-  pantryItems  PantryItem[]
-  weeklySkips  WeeklySkip[]
-  extraItems   ExtraItem[]
-  reviews      RecipeReview[]
-  uploadQuotas UploadQuota[]
+  recipes       Recipe[]
+  invitesSent   Invite[]          @relation("InviteSender")
+  inviteUsed    Invite?           @relation("InviteRedeemer")
+  shoppingRuns  ShoppingHandoff[]
+  shoppingTexts ShoppingText[]
+  pantryItems   PantryItem[]
+  weeklySkips   WeeklySkip[]
+  extraItems    ExtraItem[]
+  reviews       RecipeReview[]
+  uploadQuotas  UploadQuota[]
 
   @@unique([email])
   @@index([householdId])
@@ -511,6 +513,41 @@ enum ShoppingProvider {
   INSTACART
   AMAZON_FRESH
   WHOLE_FOODS
+}
+
+/// A record that a shopping list was texted, and to how many people.
+///
+/// Initiated, not delivered. Twilio answers 201 when it accepts a message for
+/// delivery, which is not a carrier handing it to a handset, and STOP is
+/// answered at Twilio's edge without the application ever hearing about it.
+/// Until a status-callback webhook exists there is no honest way to record
+/// delivery, so this records only what the app actually witnessed: that it
+/// asked, and what the API said when it did. The column names say "accepted"
+/// for that reason, and should keep saying it even if a webhook arrives -
+/// delivery would be a second fact, not a correction to this one.
+model ShoppingText {
+  id          String   @id @default(cuid())
+  weekStart   DateTime @db.Date
+  /// Lines on the list at the moment it was sent.
+  itemCount   Int
+  /// Messages each recipient was sent, after splitting for length.
+  partCount   Int
+  /// People every part was accepted for.
+  acceptedFor Int
+  /// People a send was refused for - a rejected number, or a STOP that Twilio
+  /// answered on their behalf.
+  refusedFor  Int
+  createdAt   DateTime @default(now())
+
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([householdId, weekStart])
+  @@index([createdById])
+  @@map("shopping_text")
 }
 
 /// A record of each list handed off to a shop. Checkout happens on their side,

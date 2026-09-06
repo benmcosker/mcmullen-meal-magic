@@ -129,6 +129,42 @@ describe.skipIf(!hasDb)("the activity overview", () => {
     expect(dump).toContain('"agreedToTexts":true');
   });
 
+  it("counts texts as sent, which is all the app can know", async () => {
+    const { householdId, userId } = await makeHousehold("Cooks");
+    await prisma.shoppingText.createMany({
+      data: [
+        {
+          weekStart: new Date("2026-08-31T00:00:00.000Z"),
+          itemCount: 12,
+          partCount: 2,
+          acceptedFor: 2,
+          refusedFor: 0,
+          householdId,
+          createdById: userId,
+        },
+        {
+          weekStart: new Date("2026-09-07T00:00:00.000Z"),
+          itemCount: 9,
+          partCount: 1,
+          acceptedFor: 1,
+          refusedFor: 1,
+          householdId,
+          createdById: userId,
+        },
+      ],
+    });
+
+    const [only] = await adminOverview();
+    expect(only.texts.sent).toBe(2);
+    expect(only.texts.lastSentAt).toBeInstanceOf(Date);
+  });
+
+  it("says never for a household that has not texted", async () => {
+    await makeHousehold("Quiet");
+    const [only] = await adminOverview();
+    expect(only.texts).toEqual({ sent: 0, lastSentAt: null });
+  });
+
   it("keeps each household's numbers to itself", async () => {
     const a = await makeHousehold("A");
     await makeHousehold("B");

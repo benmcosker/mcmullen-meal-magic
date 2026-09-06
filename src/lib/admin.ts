@@ -61,6 +61,14 @@ export type AdminHousehold = {
    * this sits above the PDF and photo counts rather than matching them.
    */
   uploadAttempts: number;
+  /**
+   * Times this household texted its shopping list.
+   *
+   * Initiated, not delivered - Twilio's acceptance is all the app ever sees.
+   * Counting the sends is the honest version of "do they use the texting",
+   * and it is the only question this view can answer about it.
+   */
+  texts: { sent: number; lastSentAt: Date | null };
 };
 
 /**
@@ -75,46 +83,55 @@ export type AdminHousehold = {
  * members are small enough that the joins are not worth the SQL.
  */
 export async function adminOverview(): Promise<AdminHousehold[]> {
-  const [households, recipeCounts, plannerCounts, quotas] = await Promise.all([
-    prisma.household.findMany({
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-        members: {
-          orderBy: { name: "asc" },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            smsConsentAt: true,
-            sessions: {
-              orderBy: { createdAt: "desc" },
-              take: 1,
-              select: { createdAt: true },
+  const [households, recipeCounts, plannerCounts, quotas, textCounts] =
+    await Promise.all([
+      prisma.household.findMany({
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          members: {
+            orderBy: { name: "asc" },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              smsConsentAt: true,
+              sessions: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { createdAt: true },
+              },
             },
           },
         },
-      },
-    }),
-    prisma.recipe.groupBy({
-      by: ["householdId", "source"],
-      _count: { _all: true },
-    }),
-    prisma.plannedMeal.groupBy({
-      by: ["householdId"],
-      _count: { _all: true },
-      _max: { createdAt: true },
-    }),
-    prisma.uploadQuota.groupBy({ by: ["userId"], _sum: { count: true } }),
-  ]);
+      }),
+      prisma.recipe.groupBy({
+        by: ["householdId", "source"],
+        _count: { _all: true },
+      }),
+      prisma.plannedMeal.groupBy({
+        by: ["householdId"],
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+      prisma.uploadQuota.groupBy({ by: ["userId"], _sum: { count: true } }),
+      prisma.shoppingText.groupBy({
+        by: ["householdId"],
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+    ]);
 
   const attemptsByUser = new Map(
     quotas.map((row) => [row.userId, row._sum.count ?? 0]),
   );
   const plannerByHousehold = new Map(
     plannerCounts.map((row) => [row.householdId, row]),
+  );
+  const textsByHousehold = new Map(
+    textCounts.map((row) => [row.householdId, row]),
   );
 
   return households.map((household) => {
@@ -129,6 +146,7 @@ export async function adminOverview(): Promise<AdminHousehold[]> {
     }
 
     const planned = plannerByHousehold.get(household.id);
+    const texted = textsByHousehold.get(household.id);
 
     return {
       id: household.id,
@@ -149,6 +167,10 @@ export async function adminOverview(): Promise<AdminHousehold[]> {
         (total, member) => total + (attemptsByUser.get(member.id) ?? 0),
         0,
       ),
+      texts: {
+        sent: texted?._count._all ?? 0,
+        lastSentAt: texted?._max.createdAt ?? null,
+      },
     };
   });
 }

@@ -70,6 +70,18 @@ function HouseholdCard({ household }: { household: AdminHousehold }) {
                 : `${household.uploadAttempts} ${household.uploadAttempts === 1 ? "attempt" : "attempts"}`
             }
           />
+          {/*
+           * "Sent", never "delivered". The app watched itself ask Twilio and
+           * nothing more, so the label has to stop where the knowledge does.
+           */}
+          <Stat
+            label="Lists texted"
+            value={
+              household.texts.sent === 0
+                ? "Never"
+                : `${household.texts.sent} sent, last ${day(household.texts.lastSentAt, "unknown")}`
+            }
+          />
         </Stack>
 
         <Stack spacing={1} sx={{ mt: 2.5 }}>

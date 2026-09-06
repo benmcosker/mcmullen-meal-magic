@@ -321,10 +321,21 @@ something the code guarantees into something an administrator is trusted to
 respect. So `adminOverview` returns numbers, and a test asserts that a recipe
 title and a phone number cannot be found anywhere in what it returns.
 
-It needed no new tracking. `Recipe.source` splits typed cards from PDFs and
-photographs, `UploadQuota` already counts card reads, and the newest session
-row gives a last sign-in - with the caveat that expired sessions are cleaned
-up, so "not lately" is the honest phrase and "never" would be a lie.
+It needed almost no new tracking. `Recipe.source` splits typed cards from PDFs
+and photographs, `UploadQuota` already counts card reads, and the newest
+session row gives a last sign-in - with the caveat that expired sessions are
+cleaned up, so "not lately" is the honest phrase and "never" would be a lie.
+
+Texting was the one thing recorded nowhere, so `ShoppingText` now records it:
+a row per send, written whatever the outcome, because a household whose every
+message was refused still tried to text its list and is the more interesting
+of the two. It counts sends, never deliveries. Twilio's `201` means accepted,
+STOP is answered at Twilio's edge without the app hearing, and no status
+callback exists - so the columns say `acceptedFor` and `refusedFor`, and the
+page says "sent". If a webhook ever arrives, delivery is a second fact to
+record beside these rather than a correction to them. The row is written in a
+`try` of its own: a household that got its shopping should not be told the
+send failed because a bookkeeping row would not write.
 
 Planner use is per household, not per person: a planned meal records the
 household and the date and not who chose it, so there is no honest way to say
