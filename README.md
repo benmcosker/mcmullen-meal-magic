@@ -67,6 +67,10 @@ striped placeholders are what the app draws when a recipe has none.
   search link per ingredient plus a copyable list). An Instacart provider that
   builds a real cart is written and tested but hidden until a key exists — see
   below.
+- **An activity overview.** `/admin` lists the households, how much each is
+  using the planner, and how many cards they have uploaded. Counts and dates
+  only. Reachable by the addresses in `ADMIN_EMAILS` and answering 404 to
+  everybody else.
 - **Texting the list.** Everyone in the household who has given a number and
   agreed to be texted gets the week's shopping as an SMS, split into readable
   parts. Live: registered with the carriers and delivering.
@@ -162,7 +166,7 @@ means running them against a database you care about will empty it.
 
 ## Not built yet
 
-Two changes are agreed in shape and not started. The reasoning is written down
+One change is agreed in shape and not started. The reasoning is written down
 here because it is worth more than the ticket would be.
 
 **A hybrid library.** Every recipe is visible to every signed-in user, which is
@@ -184,26 +188,6 @@ before any of it is written:
 None of these has an obvious answer and each one picks a different set of
 tables. `Recipe.sourceFileSha256` belongs in the same change, for the reason
 under the shared library below.
-
-**An admin view, at the meta level only.** A list of people, whether they have
-used the planner, and uploads by household - no recipes, no plans, no list
-contents. The narrow scope is the point. A role that could read household
-content would falsify the sentence in the live privacy policy saying recipes
-and plans are visible to the members of the same household, and would turn
-household isolation from something the code guarantees into something an
-administrator is trusted to respect.
-
-Scoped that way it needs no new tracking. `PlannedMeal.createdAt` answers
-planner use, `Recipe.source` splits typed cards from PDFs and photographs,
-`UploadQuota` already counts upload attempts, and `Session.createdAt` gives a
-last sign-in - with the caveat that expired sessions are cleaned up, so silence
-there reads as "not lately" rather than "never". Whether a household texts its
-list is the one thing recorded nowhere: `textShoppingList` writes no row.
-
-Access belongs in an `ADMIN_EMAILS` environment variable rather than a column
-on the user: nobody can grant themselves the role through the app, and revoking
-it is a deploy rather than a database edit. The route should answer 404 rather
-than 403, so its existence is not advertised to people who cannot use it.
 
 ## Notes and limitations
 
@@ -328,6 +312,32 @@ shopping list with two extra things on it looks exactly like a shopping list.
 order in it is the whole point: exclusions apply to what the recipes asked for,
 and hand-added items go on afterwards. A fourth caller gets the same list by
 construction rather than by remembering to.
+
+**The admin view is counts and dates, and that is a boundary rather than a
+first version.** The privacy policy tells people their recipes and plans are
+visible to the members of their household. A role that could read household
+content would make that sentence false, and would turn household isolation from
+something the code guarantees into something an administrator is trusted to
+respect. So `adminOverview` returns numbers, and a test asserts that a recipe
+title and a phone number cannot be found anywhere in what it returns.
+
+It needed no new tracking. `Recipe.source` splits typed cards from PDFs and
+photographs, `UploadQuota` already counts card reads, and the newest session
+row gives a last sign-in - with the caveat that expired sessions are cleaned
+up, so "not lately" is the honest phrase and "never" would be a lie.
+
+Planner use is per household, not per person: a planned meal records the
+household and the date and not who chose it, so there is no honest way to say
+which member did the planning. The view says so by grouping that way.
+
+Who counts as an admin lives in `ADMIN_EMAILS` rather than a column on the
+user. Nobody can grant themselves the role through the app, there is no "make
+admin" button to defend, and revoking it is a deploy. Unset, the page is
+unreachable for everyone.
+
+The route answers 404 rather than 403, and there is no link to it in the nav. A
+403 tells a stranger that the page exists and that somebody holds the key; a
+404 says only what a wrong URL says.
 
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire

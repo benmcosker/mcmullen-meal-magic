@@ -1,0 +1,152 @@
+import Box from "@mui/material/Box";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { notFound } from "next/navigation";
+
+import { AppShell } from "@/components/AppShell";
+import { adminOverview, isAdmin, type AdminHousehold } from "@/lib/admin";
+import { requireUser } from "@/lib/session";
+
+/** "2026-09-06", or a word when there is no date. */
+function day(value: Date | null, absent: string): string {
+  return value ? value.toISOString().slice(0, 10) : absent;
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <Box>
+      <Typography
+        variant="overline"
+        color="text.secondary"
+        sx={{ display: "block" }}
+      >
+        {label}
+      </Typography>
+      <Typography variant="body1">{value}</Typography>
+    </Box>
+  );
+}
+
+function HouseholdCard({ household }: { household: AdminHousehold }) {
+  const { recipes, planner } = household;
+  const sources = [
+    recipes.manual ? `${recipes.manual} typed` : null,
+    recipes.pdf ? `${recipes.pdf} PDF` : null,
+    recipes.photo ? `${recipes.photo} photo` : null,
+  ].filter(Boolean);
+
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Typography variant="h3">{household.name}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Joined {day(household.createdAt, "unknown")}
+        </Typography>
+
+        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 3, mt: 2 }}>
+          <Stat
+            label="Recipes"
+            value={
+              recipes.total === 0
+                ? "None yet"
+                : `${recipes.total}${sources.length ? ` (${sources.join(", ")})` : ""}`
+            }
+          />
+          <Stat
+            label="Planner"
+            value={
+              planner.mealsPlanned === 0
+                ? "Never used"
+                : `${planner.mealsPlanned} ${planner.mealsPlanned === 1 ? "meal" : "meals"}, last ${day(planner.lastPlannedAt, "unknown")}`
+            }
+          />
+          <Stat
+            label="Card reads"
+            value={
+              household.uploadAttempts === 0
+                ? "None"
+                : `${household.uploadAttempts} ${household.uploadAttempts === 1 ? "attempt" : "attempts"}`
+            }
+          />
+        </Stack>
+
+        <Stack spacing={1} sx={{ mt: 2.5 }}>
+          {household.members.map((member) => (
+            <Box
+              key={member.email}
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "baseline",
+                gap: 1,
+                borderTop: 1,
+                borderColor: "divider",
+                pt: 1,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {member.name}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ flexGrow: 1 }}
+              >
+                {member.email}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {member.agreedToTexts ? "texts on" : "texts off"} &middot; seen{" "}
+                {day(member.lastSignInAt, "not lately")}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Who is using the app, at the meta level.
+ *
+ * Counts and dates only. No recipe titles, no plans, no shopping lists - the
+ * privacy policy tells people their recipes and plans are visible to the
+ * members of their household, and this page has to leave that true.
+ *
+ * Answers 404 rather than 403 to everybody else. A 403 tells a stranger the
+ * page exists and that somebody has the key; a 404 says only what a wrong URL
+ * says.
+ */
+export default async function AdminPage() {
+  const user = await requireUser();
+  if (!isAdmin(user.email)) notFound();
+
+  const households = await adminOverview();
+  const people = households.reduce((n, h) => n + h.members.length, 0);
+
+  return (
+    <AppShell>
+      <Typography variant="h1" sx={{ mb: 1 }}>
+        Activity
+      </Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        {households.length}{" "}
+        {households.length === 1 ? "household" : "households"}, {people}{" "}
+        {people === 1 ? "person" : "people"}. Counts and dates only - nothing
+        anybody cooked, planned or shopped for.
+      </Typography>
+
+      {households.length === 0 ? (
+        <Typography color="text.secondary">No households yet.</Typography>
+      ) : (
+        <Stack spacing={2}>
+          {households.map((household) => (
+            <HouseholdCard key={household.id} household={household} />
+          ))}
+        </Stack>
+      )}
+    </AppShell>
+  );
+}
