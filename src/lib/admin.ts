@@ -34,8 +34,24 @@ export function adminEmails(
 
   return source
     .split(",")
-    .map((entry) => unquote(entry).toLowerCase())
+    .map((entry) => normaliseAddress(unquote(entry)))
     .filter(Boolean);
+}
+
+/**
+ * Fold an address to the form both sides are compared in.
+ *
+ * Zero-width characters are stripped as well as case and space. They survive a
+ * copy out of a rich-text editor, a chat window or a password manager, they
+ * are invisible in every field that will ever show them, and one of them
+ * anywhere in the value makes the address match nothing while looking exactly
+ * right in the hosting dashboard.
+ */
+function normaliseAddress(value: string): string {
+  return value
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 /**
@@ -57,9 +73,27 @@ export function isAdmin(
   email: string | null | undefined,
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  const address = email?.trim().toLowerCase();
+  const address = normaliseAddress(email ?? "");
   if (!address) return false;
   return adminEmails(env).includes(address);
+}
+
+/**
+ * An address reduced to what can be said about it in a log.
+ *
+ * "be********@gmail.com (20 chars)". Enough to see a typo, a wrong domain or
+ * a stray invisible character - a length that disagrees with what the visible
+ * text should give is the whole point - without writing anybody's address into
+ * a log that outlives the question.
+ */
+export function maskAddress(address: string): string {
+  const at = address.lastIndexOf("@");
+  const size = `${address.length} chars`;
+  if (at <= 0) return `${address.slice(0, 2)}... (${size}, no @)`;
+
+  const local = address.slice(0, at);
+  const kept = local.slice(0, 2);
+  return `${kept}${"*".repeat(local.length - kept.length)}${address.slice(at)} (${size})`;
 }
 
 export type AdminMember = {

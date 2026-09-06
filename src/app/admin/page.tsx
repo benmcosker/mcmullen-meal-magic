@@ -10,6 +10,7 @@ import {
   adminEmails,
   adminOverview,
   isAdmin,
+  maskAddress,
   type AdminHousehold,
 } from "@/lib/admin";
 import { requireUser } from "@/lib/session";
@@ -146,8 +147,11 @@ export default async function AdminPage() {
      * putting anybody's address in it - "0 configured" is a deploy problem,
      * "1 configured" is a mismatch between the value and the account.
      */
+    const configured = adminEmails();
     console.warn(
-      `[admin] refused: ${adminEmails().length} address(es) configured`,
+      `[admin] refused: signed in as ${maskAddress(user.email.trim().toLowerCase())}; ` +
+        `${configured.length} configured: ` +
+        (configured.map(maskAddress).join(", ") || "(none)"),
     );
     notFound();
   }
