@@ -18,6 +18,9 @@ export const SECTIONS = [
   { id: "pantry", label: "Pantry" },
   { id: "spice", label: "Spices & seasoning" },
   { id: "frozen", label: "Frozen" },
+  // Things no recipe asks for. Nothing could reach the list from here until
+  // the week gained hand-added items, and they are mostly what gets added.
+  { id: "household", label: "Household" },
   // Never dropped, never silently mis-filed. An ingredient nothing recognises
   // still has to be bought, and a list that quietly loses one is worse than a
   // list with an untidy heading at the bottom.
@@ -37,6 +40,71 @@ type Rule = { section: SectionId; phrases: string[] };
  * of those is a phrase that has to be checked before the word it contains.
  */
 const RULES: Rule[] = [
+  {
+    /*
+     * Household goods, checked before anything else.
+     *
+     * Every phrase here contains a word that belongs to a food aisle - a roll,
+     * a towel, a liquid, a bag - so a later rule would win and send somebody
+     * to the bakery for kitchen roll. Multi-word phrases throughout for the
+     * same reason: bare "roll" or "soap" would start claiming real food.
+     */
+    section: "household",
+    phrases: [
+      "kitchen roll",
+      "kitchen towel",
+      "paper towel",
+      "toilet roll",
+      "toilet paper",
+      "loo roll",
+      "tissue",
+      "kitchen tissue",
+      "dish soap",
+      "dish liquid",
+      "washing up liquid",
+      "dishwasher tablet",
+      "dishwasher salt",
+      "hand soap",
+      "hand wash",
+      "shower gel",
+      "shampoo",
+      "conditioner",
+      "toothpaste",
+      "deodorant",
+      "razor",
+      "nappy",
+      "diaper",
+      "baby wipe",
+      "wet wipe",
+      "cleaning wipe",
+      "bin bag",
+      "bin liner",
+      "trash bag",
+      "garbage bag",
+      "rubbish bag",
+      "freezer bag",
+      "sandwich bag",
+      "cling film",
+      "plastic wrap",
+      "tin foil",
+      "aluminium foil",
+      "aluminum foil",
+      "kitchen foil",
+      "baking parchment",
+      "parchment paper",
+      "greaseproof paper",
+      "laundry detergent",
+      "washing powder",
+      "fabric softener",
+      "bleach",
+      "surface spray",
+      "disinfectant",
+      "scourer",
+      "washing up sponge",
+      "light bulb",
+      "battery",
+    ],
+  },
   {
     // Things named after an aisle they do not belong to.
     section: "pantry",

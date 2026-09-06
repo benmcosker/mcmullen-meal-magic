@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
+import { listExtraItems, withExtras } from "@/lib/extras";
 import { aggregateIngredients, getWeekPlan, weekStartOf } from "@/lib/grocery";
 import { getProvider, type HandoffResult } from "@/lib/shopping";
 import { createRecipe } from "@/lib/recipe-mutations";
@@ -73,13 +74,16 @@ export async function sendWeekToProviderAction(
   const user = await requireHousehold();
 
   const weekStart = weekStartOf(new Date(weekStartIso));
-  const meals = await getWeekPlan(weekStart, user.householdId);
-  const lines = aggregateIngredients(meals);
+  const [meals, extras] = await Promise.all([
+    getWeekPlan(weekStart, user.householdId),
+    listExtraItems(weekStart, user.householdId),
+  ]);
+  const lines = withExtras(aggregateIngredients(meals), extras);
 
   if (lines.length === 0) {
     return {
       ok: false,
-      error: "Nothing planned this week, so there is nothing to send.",
+      error: "Nothing on the list this week, so there is nothing to send.",
     };
   }
 

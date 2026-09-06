@@ -2,8 +2,12 @@ import { groupBySection } from "../grocery-sections";
 import { formatQuantity } from "../quantity";
 import type { GroceryLine } from "../grocery";
 
-/** "2 tbsp", "400 g", "3", or "" when there is no amount. */
+/** "2 tbsp", "400 g", "3", "a big bag", or "" when there is no amount. */
 export function formatAmount(line: GroceryLine): string {
+  // A hand-written amount is shown exactly as typed. It never had a number to
+  // format and nothing has scaled it, so formatting it would only be a chance
+  // to change what somebody wrote.
+  if (line.amountLabel) return line.amountLabel;
   if (line.quantity == null) return "";
   // Fractions read as fractions on a shopping list too - "1/2 lb" rather than
   // "0.5 lb" - including in the text message, which is the version somebody

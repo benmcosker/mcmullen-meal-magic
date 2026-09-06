@@ -29,10 +29,11 @@ import {
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { groupBySection } from "@/lib/grocery-sections";
 import type { GroceryLine, WeeklySkipRecord } from "@/lib/grocery";
-import { formatQuantity } from "@/lib/quantity";
 import type { HandoffResult, ProviderInfo } from "@/lib/shopping";
 
 import { addToPantryAction, skipForWeekAction } from "@/app/plan/skip-actions";
+import { removeExtraItemAction } from "@/app/plan/extra-actions";
+import { formatAmount } from "@/lib/shopping/format";
 
 import { RecipePickerDialog } from "./RecipePickerDialog";
 import { SideSuggestionDialog } from "./SideSuggestionDialog";
@@ -40,6 +41,7 @@ import { RecipeTile, type TileRecipe } from "./RecipeTile";
 import { ShoppingHandoffPanel } from "./ShoppingHandoffPanel";
 import type { PantryItemRecord } from "@/lib/pantry";
 
+import { AddExtraItem } from "./AddExtraItem";
 import { ExcludedIngredients } from "./ExcludedIngredients";
 
 /**
@@ -69,12 +71,6 @@ type PlannedMeal = {
   servings: number;
   title: string | null;
 };
-
-function formatAmount(line: GroceryLine): string {
-  if (line.quantity == null) return "";
-  const amount = formatQuantity(line.quantity);
-  return line.unit ? `${amount} ${line.unit}` : amount;
-}
 
 function addDaysIso(iso: string, days: number): string {
   const date = new Date(`${iso}T00:00:00.000Z`);
@@ -155,6 +151,13 @@ export function WeekPlanner({
   function gotItThisWeek(name: string) {
     startTransition(async () => {
       await skipForWeekAction(name, weekStartIso);
+      router.refresh();
+    });
+  }
+
+  function removeExtra(id: string) {
+    startTransition(async () => {
+      await removeExtraItemAction(id);
       router.refresh();
     });
   }
@@ -510,9 +513,12 @@ export function WeekPlanner({
 
           {handoff ? <ShoppingHandoffPanel result={handoff} /> : null}
 
+          <AddExtraItem weekStartIso={weekStartIso} />
+
           {groceries.length === 0 ? (
             <Typography color="text.secondary">
-              Plan some meals and the ingredients will collect here.
+              Plan some meals and the ingredients will collect here. Anything
+              else you need goes in the box above.
             </Typography>
           ) : (
             <Stack spacing={2.5}>
@@ -565,7 +571,9 @@ export function WeekPlanner({
                             {line.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {line.fromRecipes.join(", ")}
+                            {line.extraId
+                              ? "Added by hand"
+                              : line.fromRecipes.join(", ")}
                           </Typography>
                         </Box>
 
@@ -579,20 +587,32 @@ export function WeekPlanner({
                             flexShrink: 0,
                           }}
                         >
-                          <Button
-                            size="small"
-                            disabled={pending}
-                            onClick={() => gotItThisWeek(line.name)}
-                          >
-                            Got it
-                          </Button>
-                          <Button
-                            size="small"
-                            disabled={pending}
-                            onClick={() => alwaysHave(line.name)}
-                          >
-                            Always have
-                          </Button>
+                          {line.extraId ? (
+                            <Button
+                              size="small"
+                              disabled={pending}
+                              onClick={() => removeExtra(line.extraId!)}
+                            >
+                              Remove
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                size="small"
+                                disabled={pending}
+                                onClick={() => gotItThisWeek(line.name)}
+                              >
+                                Got it
+                              </Button>
+                              <Button
+                                size="small"
+                                disabled={pending}
+                                onClick={() => alwaysHave(line.name)}
+                              >
+                                Always have
+                              </Button>
+                            </>
+                          )}
                         </Stack>
                       </Box>
                     ))}

@@ -168,3 +168,31 @@ describe("groupBySection", () => {
     }
   });
 });
+
+describe("household goods", () => {
+  it("does not send kitchen roll to the bakery", () => {
+    expect(sectionFor("kitchen roll")).toBe("household");
+    expect(sectionFor("toilet roll")).toBe("household");
+    expect(sectionFor("paper towels")).toBe("household");
+  });
+
+  it("leaves the bare food word to the aisle that owns it", () => {
+    // Nearly every household phrase is multi-word for this reason: the noun
+    // inside it has to keep meaning what a recipe means by it.
+    expect(sectionFor("bread rolls")).toBe("bakery");
+    expect(sectionFor("dinner rolls")).toBe("bakery");
+    expect(sectionFor("roll")).toBe("bakery");
+  });
+
+  it("does not claim the words its phrases are built from", () => {
+    for (const word of ["paper", "liquid", "bag", "towel", "wrap"]) {
+      expect(sectionFor(word)).not.toBe("household");
+    }
+  });
+
+  it("takes the cleaning cupboard and the bathroom too", () => {
+    expect(sectionFor("washing up liquid")).toBe("household");
+    expect(sectionFor("bin bags")).toBe("household");
+    expect(sectionFor("toothpaste")).toBe("household");
+  });
+});
