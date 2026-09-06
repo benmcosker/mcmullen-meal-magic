@@ -87,9 +87,57 @@ describe.skipIf(!hasDb)("texting the shopping list", () => {
   const run = () =>
     textShoppingList({
       householdId,
+      createdById: userId,
       weekStart: monday,
       weekLabel: "this week",
     });
+
+  describe("the record it leaves", () => {
+    /*
+     * Initiated, not delivered. Twilio's 201 means accepted, and there is no
+     * status callback, so the row says what the app witnessed and no more.
+     */
+    it("records a send, with who it was accepted for", async () => {
+      const partner = await makeUser(householdId);
+      await setPhone(userId, "+15551110000");
+      await setPhone(partner, "+15552220000");
+      await planADinner(["chicken breast"]);
+
+      await run();
+
+      const rows = await prisma.shoppingText.findMany();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].acceptedFor).toBe(2);
+      expect(rows[0].refusedFor).toBe(0);
+      expect(rows[0].householdId).toBe(householdId);
+      expect(rows[0].createdById).toBe(userId);
+      expect(rows[0].itemCount).toBeGreaterThan(0);
+    });
+
+    it("records a send nobody could be reached on", async () => {
+      await setPhone(userId, "+15551110000");
+      await planADinner(["chicken breast"]);
+      send.mockResolvedValue({
+        ok: false,
+        error: "Attempt to send to unsubscribed recipient",
+        code: 21610,
+      });
+
+      await run();
+
+      const rows = await prisma.shoppingText.findMany();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].acceptedFor).toBe(0);
+      expect(rows[0].refusedFor).toBe(1);
+    });
+
+    it("writes nothing when there was nobody to send to", async () => {
+      await setPhone(userId, null);
+      await planADinner(["chicken breast"]);
+      await run();
+      expect(await prisma.shoppingText.findMany()).toHaveLength(0);
+    });
+  });
 
   describe("who it reaches", () => {
     it("texts everybody in the household who has a number", async () => {

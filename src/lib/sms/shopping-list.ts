@@ -108,6 +108,8 @@ export async function textShoppingList(params: {
   householdId: string;
   weekStart: Date;
   weekLabel: string;
+  /** Who pressed the button, for the record written at the end. */
+  createdById: string;
 }): Promise<TextListResult> {
   if (!smsAvailable()) {
     return { ok: false, error: "Texting is not set up for this deployment." };
@@ -175,6 +177,36 @@ export async function textShoppingList(params: {
       error: failure.error,
       ...(unsubscribed ? { unsubscribed: true } : {}),
     });
+  }
+
+  /*
+   * The record that this happened, written whatever the outcome.
+   *
+   * Sending was initiated the moment the loop above ran, and that is the fact
+   * worth keeping: a send where every message was refused is still a household
+   * that tried to text its list, and is the more interesting of the two. What
+   * cannot be recorded is delivery - Twilio's 201 means accepted, and a status
+   * callback that would say more does not exist yet - so nothing here claims
+   * it.
+   *
+   * Not awaited into the result: a household that got its shopping should not
+   * be told the send failed because a bookkeeping row would not write.
+   */
+  const accepted = outcomes.filter((o) => o.ok).length;
+  try {
+    await prisma.shoppingText.create({
+      data: {
+        weekStart: params.weekStart,
+        itemCount: lines.length,
+        partCount: parts.length,
+        acceptedFor: accepted,
+        refusedFor: outcomes.length - accepted,
+        householdId: params.householdId,
+        createdById: params.createdById,
+      },
+    });
+  } catch (error) {
+    console.error("[sms] could not record that the list was texted", error);
   }
 
   const delivered = outcomes.filter((o) => o.ok).map((o) => o.recipient.name);

@@ -116,13 +116,14 @@ export type TextListActionResult =
 export async function textShoppingListAction(
   weekStartIso: string,
 ): Promise<TextListActionResult> {
-  const { householdId } = await requireHousehold();
+  const user = await requireHousehold();
   const weekStart = weekStartOf(new Date(weekStartIso));
 
   let result;
   try {
     result = await textShoppingList({
-      householdId,
+      householdId: user.householdId,
+      createdById: user.id,
       weekStart,
       weekLabel: `week of ${weekStart.toISOString().slice(0, 10)}`,
     });
