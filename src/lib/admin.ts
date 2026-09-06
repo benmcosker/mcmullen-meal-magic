@@ -11,7 +11,7 @@ import { prisma } from "./db";
  * Compared case-insensitively, because an email address is typed by a person
  * and "Ben@" and "ben@" are the same inbox.
  *
- * Surrounding quotes are stripped for the same reason. A .env file wants
+ * Surrounding quotes are stripped too. A .env file wants
  * ADMIN_EMAILS="ben@example.com" and a hosting dashboard wants the bare
  * address, so the quoted form gets pasted into the dashboard and the value
  * arrives with literal quote characters in it. Nothing then matches, and the
@@ -34,24 +34,40 @@ export function adminEmails(
 
   return source
     .split(",")
-    .map((entry) => normaliseAddress(unquote(entry)))
+    .map((entry) => normaliseConfigured(unquote(entry)))
     .filter(Boolean);
 }
 
 /**
- * Fold an address to the form both sides are compared in.
+ * The configured side: the value an operator typed into a hosting dashboard.
  *
  * Zero-width characters are stripped as well as case and space. They survive a
  * copy out of a rich-text editor, a chat window or a password manager, they
  * are invisible in every field that will ever show them, and one of them
  * anywhere in the value makes the address match nothing while looking exactly
- * right in the hosting dashboard.
+ * right in the dashboard.
  */
-function normaliseAddress(value: string): string {
+function normaliseConfigured(value: string): string {
   return value
     .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
     .trim()
     .toLowerCase();
+}
+
+/**
+ * The identity side: the address an account is actually registered under.
+ *
+ * Deliberately narrower than the configured side, and the asymmetry is the
+ * point. Forgiving an invisible character in ADMIN_EMAILS helps the one person
+ * who set it. Forgiving one here would mean an address that merely *folds*
+ * into the admin's is treated as the admin's - so an account registered as
+ * "ben<zero-width>@example.com", which the unique index is perfectly happy to
+ * hold alongside the real one, would be let in. Signup is invite-only, so this
+ * is narrow rather than open, but "hard to reach" is not a reason to compare
+ * an identity by anything other than what it literally is.
+ */
+function normaliseIdentity(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 /**
@@ -73,7 +89,7 @@ export function isAdmin(
   email: string | null | undefined,
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  const address = normaliseAddress(email ?? "");
+  const address = normaliseIdentity(email ?? "");
   if (!address) return false;
   return adminEmails(env).includes(address);
 }

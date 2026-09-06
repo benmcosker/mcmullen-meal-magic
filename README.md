@@ -346,9 +346,11 @@ user. Nobody can grant themselves the role through the app, there is no "make
 admin" button to defend, and revoking it is a deploy. Unset, the page is
 unreachable for everyone.
 
-The route answers 404 rather than 403, and there is no link to it in the nav. A
-403 tells a stranger that the page exists and that somebody holds the key; a
-404 says only what a wrong URL says.
+The route answers 404 rather than 403. A 403 tells a stranger that the page
+exists and that somebody holds the key; a 404 says only what a wrong URL says.
+The nav shows an Activity link to an admin and to nobody else, which is a
+convenience rather than the gate: `/admin` decides for itself on every request,
+so a link shown in error leads to the same 404 as a guessed URL.
 
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
