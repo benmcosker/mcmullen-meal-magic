@@ -35,6 +35,13 @@ Read both before proposing work on sharing, admin access, or texting.
 - **Nobody types anybody else's phone number.** `saveOwnPhone` writes the
   caller's own row and nothing else.
 
+### Branches
+
+One branch per change, named for what the change does:
+`claude/<kebab-case-description>` - `claude/sms-consent`, `claude/heic-upload`,
+`claude/upload-rate-limit`. Never reuse a branch for unrelated work, and never
+reuse one whose pull request has already merged; start a fresh one off `main`.
+
 ### Before pushing
 
 `npm run typecheck`, `npm test`, `npm run format:check`. The tests share one
