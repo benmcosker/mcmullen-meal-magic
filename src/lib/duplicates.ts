@@ -17,12 +17,19 @@ export function hashBytes(bytes: Uint8Array): string {
  * model call whose result is thrown away. A photograph only matches a
  * byte-identical photograph - two shots of the same card differ in every
  * pixel - so this catches re-uploading a file, not re-photographing a card.
+ *
+ * Scoped to the household. A widely printed card that two families both own is
+ * not a duplicate, and answering the second one with "you already have this"
+ * would be both wrong and a way of learning what the first one keeps.
  */
 export async function findRecipeBySourceHash(
   sourceFileSha256: string,
+  householdId: string,
 ): Promise<ExistingRecipe | null> {
   return prisma.recipe.findUnique({
-    where: { sourceFileSha256 },
+    where: {
+      householdId_sourceFileSha256: { householdId, sourceFileSha256 },
+    },
     select: { id: true, title: true },
   });
 }
@@ -45,11 +52,16 @@ export const TITLE_SIMILARITY_THRESHOLD = 0.55;
  * than a block: two genuinely different recipes can share a name, and the
  * household is better placed than a similarity score to judge which.
  *
+ * Only warns about recipes the household can actually open. A warning naming
+ * a dish somebody cannot look at is no help, and the name is itself the thing
+ * a private recipe is keeping.
+ *
  * Uses the pg_trgm index already on recipe.title, so it costs an index lookup
  * rather than a scan.
  */
 export async function findSimilarlyTitled(
   title: string,
+  householdId: string,
   options: { excludeId?: string; limit?: number } = {},
 ): Promise<ExistingRecipe[]> {
   const trimmed = title.trim();
@@ -62,6 +74,7 @@ export async function findSimilarlyTitled(
     FROM "recipe"
     WHERE similarity("title", ${trimmed}) >= ${TITLE_SIMILARITY_THRESHOLD}
       AND ("id" <> ${options.excludeId ?? ""})
+      AND ("householdId" = ${householdId} OR "isShared")
     ORDER BY score DESC
     LIMIT ${options.limit ?? 3}
   `;

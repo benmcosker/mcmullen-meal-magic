@@ -267,7 +267,7 @@ model Recipe {
   /// Unique across the whole library, because the library is shared: if
   /// somebody has already uploaded this exact card, the recipe is there for
   /// everyone and a second copy is noise rather than a second dish.
-  sourceFileSha256 String? @unique
+  sourceFileSha256 String?
   /// The dish, not the card. Best-effort: lifted out of a PDF when there is a
   /// usable picture in it, and otherwise added by hand later.
   imageUrl         String?
@@ -285,6 +285,21 @@ model Recipe {
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
+  /// Whether households other than the owner can see this recipe.
+  ///
+  /// False by default, so a card somebody uploads is their household's until
+  /// they say otherwise. Everything that existed when this column arrived was
+  /// backfilled true: the library had been visible to everybody since it was
+  /// built, and making it private retroactively would have taken recipes away
+  /// from people who had been reading them for months.
+  ///
+  /// Shared means shared with every household rather than with named ones.
+  /// There are a handful of households, all of them invited by somebody here,
+  /// and a targeting table would be machinery for a permission nobody has
+  /// asked for. It can replace this boolean later without the read path
+  /// changing shape.
+  isShared Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -298,9 +313,14 @@ model Recipe {
   /// Prisma Client cannot select Unsupported columns; search runs as raw SQL.
   searchVector Unsupported("tsvector")? @map("search_vector")
 
+  /// Scoped to the household, not global. A widely printed card two families
+  /// both own is not a duplicate of anything - and a global constraint would
+  /// tell the second one that a recipe it cannot see already exists.
+  @@unique([householdId, sourceFileSha256])
   @@index([householdId])
   @@index([createdById])
   @@index([createdAt])
+  @@index([isShared])
   @@index([searchVector], type: Gin)
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)

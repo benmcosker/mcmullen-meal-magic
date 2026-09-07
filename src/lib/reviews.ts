@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { visibleRecipes } from "./recipe-visibility";
 import {
   NO_REVIEWS,
   reviewInput,
@@ -104,22 +105,26 @@ export async function getMyReview(
  * An upsert rather than a create: changing your mind about a dish you have now
  * cooked three times should move the average, not vote twice.
  *
- * Anyone signed in may review anything in the library, whichever household
- * added it. That is the point of a shared library: an average over one family's
- * three opinions says much less than one over everybody's.
+ * Anyone who can see a recipe may review it, whichever household added it.
+ * Ratings follow visibility exactly: a shared recipe carries one average over
+ * everybody who can open it, which says far more than one family's three
+ * opinions - and a private one is rated only by the family that has it.
  *
- * The recipe is still checked to exist, because the id arrives from a form post
- * and a review attached to nothing is worse than an error.
+ * The check is on visibility rather than existence, because the id arrives
+ * from a form post. Without it a guessed id would let somebody move the
+ * average on a recipe they cannot read, and learn from the response that it is
+ * there.
  */
 export async function saveReview(
   recipeId: string,
   userId: string,
+  householdId: string,
   input: ReviewInput,
 ): Promise<string> {
   const { stars, body } = reviewInput.parse(input);
 
-  const recipe = await prisma.recipe.findUnique({
-    where: { id: recipeId },
+  const recipe = await prisma.recipe.findFirst({
+    where: { AND: [{ id: recipeId }, visibleRecipes(householdId)] },
     select: { id: true },
   });
   if (!recipe) throw new Error("No such recipe");

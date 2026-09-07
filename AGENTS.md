@@ -11,5 +11,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Project notes
 
 See `CLAUDE.md` for the traps specific to this repo, and `README.md` for the
-long form — its **Not built yet** and **Notes and limitations** sections are
-where the reasoning lives.
+long form — its **Notes and limitations** section is where the reasoning lives.

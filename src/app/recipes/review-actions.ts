@@ -31,7 +31,7 @@ export async function saveReviewAction(
   const user = await requireHousehold();
 
   try {
-    await saveReview(recipeId, user.id, input);
+    await saveReview(recipeId, user.id, user.householdId, input);
   } catch (error) {
     return {
       ok: false,
