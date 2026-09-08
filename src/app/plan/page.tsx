@@ -11,6 +11,7 @@ import {
   weekStartOf,
 } from "@/lib/grocery";
 import { listPantryItems } from "@/lib/pantry";
+import { visibleRecipes } from "@/lib/recipe-visibility";
 import { buildShoppingList } from "@/lib/week-list";
 import { NO_REVIEWS } from "@/lib/review-schema";
 import { getReviewSummaries } from "@/lib/reviews";
@@ -30,7 +31,11 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
 
   const [meals, recipes, skips, pantry, extras] = await Promise.all([
     getWeekPlan(weekStart, householdId),
+    // The picker offers this household's recipes and whatever others have
+    // shared - the same library the recipes page shows, so a dish cannot be
+    // planned from a list it is not in.
     prisma.recipe.findMany({
+      where: visibleRecipes(householdId),
       select: { id: true, title: true, servings: true, imageUrl: true },
       orderBy: { title: "asc" },
     }),

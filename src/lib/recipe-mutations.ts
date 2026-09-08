@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { visibleRecipes } from "./recipe-visibility";
 import type { RecipeInput } from "./recipe-schema";
 import { upsertTags } from "./recipes";
 
@@ -150,12 +151,50 @@ export async function deleteRecipe(
   return count > 0;
 }
 
+/**
+ * Share a recipe with the other households, or take it back.
+ *
+ * Scoped to the owner like every other write: the id arrives from a form post,
+ * and sharing is not a thing you may do to somebody else's recipe in either
+ * direction. Returns false when the recipe is not theirs, which the caller
+ * treats the same as it not existing.
+ *
+ * Un-sharing is not retroactive to a week already planned. A household that
+ * put this on Thursday keeps it there and still gets its ingredients on the
+ * shopping list - pulling dinner out of somebody's week days later, because
+ * another family changed its mind, is worse than the recipe staying readable
+ * to the few people who had already committed to cooking it.
+ */
+export async function setRecipeShared(
+  id: string,
+  householdId: string,
+  isShared: boolean,
+): Promise<boolean> {
+  const { count } = await prisma.recipe.updateMany({
+    where: { id, householdId },
+    data: { isShared },
+  });
+  return count > 0;
+}
+
 /** Tags with a usage count, for the filter bar. */
-export async function listTagsWithCounts(): Promise<
-  { id: string; name: string; slug: string; count: number }[]
-> {
+export async function listTagsWithCounts(
+  householdId: string,
+): Promise<{ id: string; name: string; slug: string; count: number }[]> {
+  /*
+   * Counted over the recipes this household can see, not over the table.
+   *
+   * Tags themselves are a shared vocabulary, but their counts are not: a
+   * count taken over everything would offer a filter that returns nothing,
+   * and the number itself would say how many recipes exist behind a door
+   * this household cannot open.
+   */
   const tags = await prisma.tag.findMany({
-    include: { _count: { select: { recipes: true } } },
+    include: {
+      _count: {
+        select: { recipes: { where: { recipe: visibleRecipes(householdId) } } },
+      },
+    },
     orderBy: { name: "asc" },
   });
 

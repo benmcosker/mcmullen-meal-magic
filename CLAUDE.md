@@ -10,14 +10,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Project notes
 
-`README.md` is the long form, and two of its sections carry things this file
-should point at rather than copy: **Not built yet** (the hybrid library and the
-meta-level admin view, with the decisions each still needs before any schema is
-written) and **Notes and limitations** (why the SMS consent machinery looks the
-way it does, what the upload quota is for, and what has never been verified).
-Read both before proposing work on sharing, admin access, or texting.
+`README.md` is the long form, and its **Notes and limitations** section carries
+what this file should point at rather than copy: how recipe visibility works and
+the three things that follow from it, why the SMS consent machinery looks the
+way it does, what the upload quota is for, and what has never been verified.
+Read it before proposing work on sharing, admin access, or texting.
 
 ### Traps that have actually cost time here
+
+- **Recipe visibility lives in one file.** `src/lib/recipe-visibility.ts` is
+  the only place that decides who may read a recipe, and search needs it twice
+  - once as a Prisma filter, once as SQL. A new read that does not go through
+    it is how another family's dinner gets shown.
 
 - **A function cannot cross from a server component into MUI's client code.**
   `component={Link}`, an `sx` callback, an `onChange` handed down from a server

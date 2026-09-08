@@ -136,7 +136,10 @@ async function handleUpload(request: Request) {
   // difference between an instant answer and a slow, billable call whose
   // result gets thrown away.
   const sourceFileSha256 = hashBytes(bytes);
-  const alreadyHave = await findRecipeBySourceHash(sourceFileSha256);
+  const alreadyHave = await findRecipeBySourceHash(
+    sourceFileSha256,
+    user.householdId,
+  );
   if (alreadyHave) {
     return NextResponse.json(
       {
@@ -195,7 +198,10 @@ async function handleUpload(request: Request) {
   // A different file for a dish already in the library shares no bytes with it,
   // so only the title gives it away. Reported alongside the extraction as a
   // warning: the review screen can show it, and the person decides.
-  const similar = await findSimilarlyTitled(extraction.recipe.title);
+  const similar = await findSimilarlyTitled(
+    extraction.recipe.title,
+    user.householdId,
+  );
 
   return NextResponse.json({
     recipe: extraction.recipe,

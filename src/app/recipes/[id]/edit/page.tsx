@@ -12,7 +12,7 @@ export default async function EditRecipePage({
   const { householdId } = await requireHousehold();
 
   const { id } = await params;
-  const recipe = await getRecipe(id);
+  const recipe = await getRecipe(id, householdId);
   // Reachable by typing the URL even though the button is hidden. Saving would
   // be refused anyway; this is so nobody fills in a form that cannot be saved.
   if (!recipe || recipe.householdId !== householdId) notFound();

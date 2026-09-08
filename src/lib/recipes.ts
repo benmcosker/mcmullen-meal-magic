@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { DEFAULT_SORT, type RecipeSort } from "./recipe-sort";
 import { NO_REVIEWS, type ReviewSummary } from "./review-schema";
+import { visibleRecipes, visibleRecipesSql } from "./recipe-visibility";
 import { getReviewSummaries } from "./reviews";
 
 export type RecipeSearchHit = {
@@ -11,6 +12,12 @@ export type RecipeSearchHit = {
 };
 
 export type RecipeSearchOptions = {
+  /**
+   * Whose view of the library this is: their own recipes, plus everything
+   * other households have shared. Required rather than optional, so a new
+   * call site cannot quietly search the lot.
+   */
+  householdId: string;
   /** Free-text query. Empty or whitespace-only returns the newest recipes. */
   query?: string;
   /** Tag slugs. A recipe must carry every slug listed to match. */
@@ -46,7 +53,7 @@ export type RecipeSearchOptions = {
  * a fully-hydrated Prisma object, so it re-fetches by ID and re-applies order.
  */
 export async function searchRecipeIds(
-  options: RecipeSearchOptions = {},
+  options: RecipeSearchOptions,
 ): Promise<RecipeSearchHit[]> {
   const query = options.query?.trim() ?? "";
   const sort = options.sort ?? DEFAULT_SORT;
@@ -86,6 +93,8 @@ export async function searchRecipeIds(
   // Escape LIKE wildcards so a user typing "100%" searches for that literally.
   const like = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
+  const visible = visibleRecipesSql(options.householdId);
+
   const tagFilter =
     tagSlugs.length > 0
       ? Prisma.sql`
@@ -103,7 +112,7 @@ export async function searchRecipeIds(
       SELECT r."id", 0::float8 AS rank
       FROM "recipe" r
       ${ratingJoin}
-      WHERE TRUE ${tagFilter}
+      WHERE ${visible} ${tagFilter}
       ORDER BY ${orderBy}
       LIMIT ${limit} OFFSET ${offset}
     `);
@@ -115,7 +124,7 @@ export async function searchRecipeIds(
       ts_rank(r."search_vector", websearch_to_tsquery('english', ${query}))::float8 AS rank
     FROM "recipe" r
     ${ratingJoin}
-    WHERE (
+    WHERE ${visible} AND (
       r."search_vector" @@ websearch_to_tsquery('english', ${query})
       OR r."title" ILIKE ${like}
       OR r."description" ILIKE ${like}
@@ -178,7 +187,7 @@ async function withReviewSummaries<T extends { id: string }>(
 
 /** Search and hydrate in one call, preserving rank order. */
 export async function searchRecipes(
-  options: RecipeSearchOptions = {},
+  options: RecipeSearchOptions,
 ): Promise<RecipeWithRelations[]> {
   const hits = await searchRecipeIds(options);
   if (hits.length === 0) return [];
@@ -186,7 +195,12 @@ export async function searchRecipes(
   const ids = hits.map((h) => h.id);
   const recipes = await withReviewSummaries(
     await prisma.recipe.findMany({
-      where: { id: { in: ids } },
+      // The ids came from a query that already applied the rule; applying it
+      // again costs an indexed comparison and means the hydrate cannot be the
+      // step that widens what a search returned.
+      where: {
+        AND: [{ id: { in: ids } }, visibleRecipes(options.householdId)],
+      },
       include: recipeInclude,
     }),
   );
@@ -199,13 +213,18 @@ export async function searchRecipes(
 }
 
 /**
- * One recipe. Readable by anyone signed in, whichever household added it.
+ * One recipe, if this household may read it.
+ *
+ * Null covers both "no such recipe" and "not yours to see", and the caller
+ * turns either into the same 404. Telling the two apart would answer a
+ * stranger's guessed id with the news that it exists.
  */
 export async function getRecipe(
   id: string,
+  householdId: string,
 ): Promise<RecipeWithRelations | null> {
-  const recipe = await prisma.recipe.findUnique({
-    where: { id },
+  const recipe = await prisma.recipe.findFirst({
+    where: { AND: [{ id }, visibleRecipes(householdId)] },
     include: recipeInclude,
   });
   if (!recipe) return null;
@@ -241,11 +260,11 @@ export function slugifyTag(name: string): string {
 }
 
 /**
- * How many dishes are in the box, whoever added them.
+ * How many dishes this household can see: its own, plus what is shared.
  *
- * Unscoped like the rest of the library reads: the count names the shared
- * collection, not the caller's share of it.
+ * The same rule as the library it heads, or the count promises dishes the
+ * grid will not show.
  */
-export async function countRecipes(): Promise<number> {
-  return prisma.recipe.count();
+export async function countRecipes(householdId: string): Promise<number> {
+  return prisma.recipe.count({ where: visibleRecipes(householdId) });
 }

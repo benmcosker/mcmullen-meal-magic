@@ -19,7 +19,7 @@ import { requireHousehold } from "@/lib/session";
 export default async function RecipesPage({
   searchParams,
 }: PageProps<"/recipes">) {
-  const { householdName } = await requireHousehold();
+  const { householdId, householdName } = await requireHousehold();
 
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
@@ -33,9 +33,9 @@ export default async function RecipesPage({
   const sort = parseSort(params.sort);
 
   const [recipes, tags, libraryCount] = await Promise.all([
-    searchRecipes({ query, tagSlugs, sort }),
-    listTagsWithCounts(),
-    countRecipes(),
+    searchRecipes({ householdId, query, tagSlugs, sort }),
+    listTagsWithCounts(householdId),
+    countRecipes(householdId),
   ]);
 
   // The hero is the front page arguing for one recipe. Once you have searched

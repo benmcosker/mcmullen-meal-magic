@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { MealSlot, ShoppingProvider } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { weekStartOf } from "@/lib/grocery";
+import { visibleRecipes } from "@/lib/recipe-visibility";
 import { weekShoppingList } from "@/lib/week-list";
 import { getProvider, type HandoffResult } from "@/lib/shopping";
 import { createRecipe } from "@/lib/recipe-mutations";
@@ -31,12 +32,19 @@ export async function setPlannedMealAction(input: {
       where: { householdId, date, slot: input.slot },
     });
   } else {
-    // Any recipe in the library can be planned, whoever added it - that is
-    // what sharing the library is for. It still has to exist: the id comes
-    // from a form post, and a planned meal pointing at nothing shows up as a
-    // blank evening rather than an error.
-    const recipe = await prisma.recipe.findUnique({
-      where: { id: input.recipeId },
+    /*
+     * Anything this household can see can be planned - its own, and whatever
+     * other households have shared. Checked rather than trusted: the id comes
+     * from a form post, so without this a guessed id would put another
+     * family's private dish on the week and its ingredients on the shopping
+     * list, which is a way of reading a recipe without opening it.
+     *
+     * A reference, not a copy. The plan stores the id, so the owner's later
+     * edits reach a meal somebody else has already planned - which is the
+     * point of sharing rather than handing out duplicates.
+     */
+    const recipe = await prisma.recipe.findFirst({
+      where: { AND: [{ id: input.recipeId }, visibleRecipes(householdId)] },
       select: { id: true },
     });
     if (!recipe) return;

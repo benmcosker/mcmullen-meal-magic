@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { formatQuantity } from "@/lib/quantity";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
+import { ShareRecipeToggle } from "@/components/ShareRecipeToggle";
 import { IconChip } from "@/components/IconChip";
 import { LinkButton } from "@/components/LinkButton";
 import { RecipeImageUploader } from "@/components/RecipeImageUploader";
@@ -39,7 +40,10 @@ export default async function RecipePage({
   const user = await requireHousehold();
 
   const { id } = await params;
-  const recipe = await getRecipe(id);
+  const recipe = await getRecipe(id, user.householdId);
+  // Null covers "no such recipe" and "not shared with you" alike, and both are
+  // the same 404: telling them apart would answer a guessed id with the news
+  // that it exists.
   if (!recipe) notFound();
 
   const [reviews, myReview] = await Promise.all([
@@ -291,6 +295,10 @@ export default async function RecipePage({
         </CardContent>
       </Card>
 
+      {mine ? (
+        <ShareRecipeToggle recipeId={recipe.id} isShared={recipe.isShared} />
+      ) : null}
+
       <Typography
         variant="caption"
         color="text.secondary"
@@ -298,6 +306,12 @@ export default async function RecipePage({
       >
         Added by {recipe.createdBy.name}
         {mine ? null : <> of {recipe.household.name}</>}
+        {/*
+         * Said on somebody else's recipe as well as your own. On theirs it is
+         * the answer to "why can I read this", which is worth knowing next to
+         * the name of the family it belongs to.
+         */}
+        {!mine && recipe.isShared ? <> · Shared with you</> : null}
         {recipe.sourceName ? <> · From {recipe.sourceName}</> : null}
         {recipe.sourceUrl ? (
           <>

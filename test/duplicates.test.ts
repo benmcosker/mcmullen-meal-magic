@@ -61,14 +61,17 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
       const hash = hashBytes(bytes("the pdf"));
       await add("Chicken Piccata", hash);
 
-      const found = await findRecipeBySourceHash(hash);
+      const found = await findRecipeBySourceHash(hash, householdId);
       expect(found?.title).toBe("Chicken Piccata");
     });
 
     it("does not match a different file", async () => {
       await add("Chicken Piccata", hashBytes(bytes("the pdf")));
       expect(
-        await findRecipeBySourceHash(hashBytes(bytes("other pdf"))),
+        await findRecipeBySourceHash(
+          hashBytes(bytes("other pdf")),
+          householdId,
+        ),
       ).toBeNull();
     });
 
@@ -93,13 +96,19 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
   describe("by title", () => {
     it("flags an all-but-identical title", async () => {
       await add("Chicken Piccata");
-      const similar = await findSimilarlyTitled("Chicken Piccata!");
+      const similar = await findSimilarlyTitled(
+        "Chicken Piccata!",
+        householdId,
+      );
       expect(similar.map((s) => s.title)).toContain("Chicken Piccata");
     });
 
     it("flags a title differing only in case and spacing", async () => {
       await add("Sheet Pan Salmon");
-      const similar = await findSimilarlyTitled("  sheet pan salmon ");
+      const similar = await findSimilarlyTitled(
+        "  sheet pan salmon ",
+        householdId,
+      );
       expect(similar.map((s) => s.title)).toContain("Sheet Pan Salmon");
     });
 
@@ -107,19 +116,23 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
       // The failure that would matter: warning on every chicken recipe trains
       // people to dismiss the warning without reading it.
       await add("Chicken Piccata");
-      expect(await findSimilarlyTitled("Chicken Soup")).toEqual([]);
-      expect(await findSimilarlyTitled("Roast Chicken")).toEqual([]);
+      expect(await findSimilarlyTitled("Chicken Soup", householdId)).toEqual(
+        [],
+      );
+      expect(await findSimilarlyTitled("Roast Chicken", householdId)).toEqual(
+        [],
+      );
     });
 
     it("does not flag an unrelated title", async () => {
       await add("Chicken Piccata");
-      expect(await findSimilarlyTitled("Lentil Dahl")).toEqual([]);
+      expect(await findSimilarlyTitled("Lentil Dahl", householdId)).toEqual([]);
     });
 
     it("can exclude a recipe from its own results", async () => {
       const id = await add("Chicken Piccata");
       expect(
-        await findSimilarlyTitled("Chicken Piccata", {
+        await findSimilarlyTitled("Chicken Piccata", householdId, {
           excludeId: id,
         }),
       ).toEqual([]);
@@ -127,7 +140,7 @@ describe.skipIf(!hasDb)("duplicate detection", () => {
 
     it("returns nothing for a blank title rather than everything", async () => {
       await add("Chicken Piccata");
-      expect(await findSimilarlyTitled("   ")).toEqual([]);
+      expect(await findSimilarlyTitled("   ", householdId)).toEqual([]);
     });
   });
 });

@@ -32,7 +32,8 @@ striped placeholders are what the app draws when a recipe has none.
 ## What works
 
 - **Invite-only accounts.** Signup requires a code minted by an existing user.
-  Every recipe is visible to every signed-in user; the library is shared.
+  A recipe belongs to the household that added it and is private to them until
+  they share it; a shared one appears in every household's library.
 - **Recipe library.** Create, edit and delete recipes with ingredients, method,
   servings, timings, oven temperature, resting time, yield, equipment and tags -
   everything a recipe card prints, so you never have to reopen the original.
@@ -164,31 +165,6 @@ schema is present.
 The integration tests share one database and clean up after themselves, which
 means running them against a database you care about will empty it.
 
-## Not built yet
-
-One change is agreed in shape and not started. The reasoning is written down
-here because it is worth more than the ticket would be.
-
-**A hybrid library.** Every recipe is visible to every signed-in user, which is
-right for one household and wrong for several. The intended end state is
-private by default with explicit sharing, and four questions decide the schema
-before any of it is written:
-
-- Is a recipe shared one at a time, or is a whole box shared with someone?
-- What does sharing do to ratings? One average that follows the recipe
-  everywhere says something different from each household rating its own copy,
-  and only one of those keeps "how many people liked this" meaningful.
-- Can another household plan your recipe, and is what lands on their week a
-  reference or a copy? A reference means your later edits reach a meal they
-  have already planned; a copy means the recipe stops changing the moment they
-  take it.
-- Do shared recipes mix into the library with a marker, or live in a view of
-  their own?
-
-None of these has an obvious answer and each one picks a different set of
-tables. `Recipe.sourceFileSha256` belongs in the same change, for the reason
-under the shared library below.
-
 ## Notes and limitations
 
 **Texting works, and getting there was most of the work.** The sender itself is
@@ -261,96 +237,46 @@ runaway loop being unbounded. `UPLOAD_DAILY_LIMIT` moves it; a value that is
 not a positive integer falls back to the default rather than becoming `NaN`,
 which would compare false against everything and quietly switch the limit off.
 
-**The shared library has two edges sharper than the sharing itself.** That
-every recipe is visible to everybody is deliberate and stated above; two
-smaller things inherit it and are easier to miss. `Recipe.sourceFileSha256` is
-unique across the whole table with no household in the lookup, so the second
-household to upload a widely printed card is told it duplicates one they cannot
-see. `Tag.name` and `Tag.slug` are globally unique too, so tag vocabulary is
-shared whether or not the recipes are. Both are fine for one household, and
-both want settling alongside the hybrid library rather than before it.
+**A recipe is private until it is shared, and sharing means sharing with
+everybody.** Not with a named household: there are a handful of them, all
+invited by somebody already here, and a targeting table would be machinery for
+a permission nobody has asked for. `Recipe.isShared` can become a join table
+later without the read path changing shape.
 
-**A hand-added item is not an ingredient, and the list treats it as one
-anyway.** Kitchen roll has to be on the list you walk round the shop with, so
-it lives in the same lines, sorts into the same aisles, and reaches the
-hand-off and the text message by the same route. Three things follow from
-that, and each was a choice.
+Everything that existed when the column arrived was backfilled shared. The
+library had been visible to every signed-in person since it was built, and
+defaulting it to private would have taken dishes away from households that had
+been cooking from them for months. Only recipes added afterwards start private.
 
-The amount is free text. "A big bag" is a real answer to how much, and nothing
-scales or totals a hand-added line, so nothing needs it to parse. That is also
-why such a line sits beside a recipe's rather than merging into it: there is no
-number to add, and one line could not say how much of the milk was somebody's
-own idea.
+The rule lives in `src/lib/recipe-visibility.ts` and nowhere else, because "who
+can see this" is exactly the kind of thing that is right in four places and
+forgotten in the fifth - and the fifth is the one that shows somebody another
+family's dinner. Search needs it twice, once as a Prisma filter and once as SQL,
+since ranking cannot be expressed in Prisma; both live in that file so the pair
+is read and changed together.
 
-It is asked for in its own field rather than read out of the name. Splitting
-"2 lemons" into a number and a noun works until somebody types "7 Up".
+Three things follow from visibility that are easy to miss:
 
-The row offers Remove where a recipe's offers "Got it" and "Always have". Both
-of those work by hiding something a recipe asked for; neither can hide
-something you asked for yourself, and a pantry staple that quietly removed a
-line you had just typed would be the worst of the three.
+- **Ratings follow it exactly.** One average per recipe, over everybody who can
+  open it. A shared recipe pools verdicts across households, which is the point;
+  a private one is rated only by the family that has it. Writing a review checks
+  visibility rather than existence, or a guessed id would move an average on a
+  dish somebody cannot read - and the response would tell them it is there.
+- **Tag counts are per household.** The vocabulary is shared, the numbers are
+  not: a count over the whole table offers a filter that returns nothing, and
+  the number itself says how many recipes sit behind a closed door.
+- **Duplicate detection is per household.** `sourceFileSha256` used to be
+  globally unique, so a widely printed card that two families both own was
+  called a duplicate - and the refusal told the second family that a recipe they
+  could not see existed. The constraint is now on (household, hash).
 
-Hand-added items also needed an aisle of their own. Nothing non-food could
-reach the list before, so `sectionFor` had no Household section and sent
-kitchen roll to the bakery - it matched "roll". The phrases in that section are
-nearly all multi-word for the same reason, since a bare "roll", "paper" or
-"bag" has to keep meaning what a recipe means by it.
-
-The list is week-scoped, like the plan and unlike the pantry. Next week starts
-empty, which is right for kitchen roll and wrong for salt; salt is what the
-pantry is for.
-
-**The week's list is assembled in one place, and was not always.** Three
-things need it and none of them may disagree: the planner renders it, the shop
-hand-off sends it, and the text message is read from it in the aisle. They did
-disagree. The hand-off built its lines without exclusions, so a pantry staple
-you never buy and a line you had already ticked off both went to Amazon anyway,
-while the same week texted correctly - and nothing announced it, because a
-shopping list with two extra things on it looks exactly like a shopping list.
-
-`buildShoppingList` in `src/lib/week-list.ts` is now the only assembly, and the
-order in it is the whole point: exclusions apply to what the recipes asked for,
-and hand-added items go on afterwards. A fourth caller gets the same list by
-construction rather than by remembering to.
-
-**The admin view is counts and dates, and that is a boundary rather than a
-first version.** The privacy policy tells people their recipes and plans are
-visible to the members of their household. A role that could read household
-content would make that sentence false, and would turn household isolation from
-something the code guarantees into something an administrator is trusted to
-respect. So `adminOverview` returns numbers, and a test asserts that a recipe
-title and a phone number cannot be found anywhere in what it returns.
-
-It needed almost no new tracking. `Recipe.source` splits typed cards from PDFs
-and photographs, `UploadQuota` already counts card reads, and the newest
-session row gives a last sign-in - with the caveat that expired sessions are
-cleaned up, so "not lately" is the honest phrase and "never" would be a lie.
-
-Texting was the one thing recorded nowhere, so `ShoppingText` now records it:
-a row per send, written whatever the outcome, because a household whose every
-message was refused still tried to text its list and is the more interesting
-of the two. It counts sends, never deliveries. Twilio's `201` means accepted,
-STOP is answered at Twilio's edge without the app hearing, and no status
-callback exists - so the columns say `acceptedFor` and `refusedFor`, and the
-page says "sent". If a webhook ever arrives, delivery is a second fact to
-record beside these rather than a correction to them. The row is written in a
-`try` of its own: a household that got its shopping should not be told the
-send failed because a bookkeeping row would not write.
-
-Planner use is per household, not per person: a planned meal records the
-household and the date and not who chose it, so there is no honest way to say
-which member did the planning. The view says so by grouping that way.
-
-Who counts as an admin lives in `ADMIN_EMAILS` rather than a column on the
-user. Nobody can grant themselves the role through the app, there is no "make
-admin" button to defend, and revoking it is a deploy. Unset, the page is
-unreachable for everyone.
-
-The route answers 404 rather than 403. A 403 tells a stranger that the page
-exists and that somebody holds the key; a 404 says only what a wrong URL says.
-The nav shows an Activity link to an admin and to nobody else, which is a
-convenience rather than the gate: `/admin` decides for itself on every request,
-so a link shown in error leads to the same 404 as a guessed URL.
+**Planning a shared recipe takes a reference, not a copy.** The plan stores the
+id, so the owner's later edits reach a meal another household has already
+planned. Un-sharing is deliberately not retroactive: a week already planned
+keeps the dish and still gets its ingredients on the shopping list. Pulling
+dinner out of somebody's Thursday, days later, because another family changed
+its mind is worse than the recipe staying readable to the few who had committed
+to cooking it.
 
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
