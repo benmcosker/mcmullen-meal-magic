@@ -74,6 +74,18 @@ title, rating and a side row. Three dinners plus sides may want day tiles to
 become full-width rows there. Expect to iterate on that; it is most of the
 work. Roughly half a session all in.
 
+### Agents
+
+`.claude/agents/` holds four, split by discipline: **backend** (server actions,
+`src/lib`, API routes), **frontend** (components and pages, and the RSC boundary
+that keeps biting), **data** (schema, migrations, the constraints other code
+leans on), **design** (theme, type scale, how it reads on a phone). Each carries
+the traps for its own layer, so dispatch by what the change touches.
+
+`scripts/browse.mjs` drives the running app in a real browser and reports page
+and console errors. It is the only thing that catches a hydration failure, and
+it exits non-zero on one.
+
 ### Branches
 
 One branch per change, named for what the change does:
