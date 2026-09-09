@@ -278,6 +278,39 @@ dinner out of somebody's Thursday, days later, because another family changed
 its mind is worse than the recipe staying readable to the few who had committed
 to cooking it.
 
+**Two kinds of rot, and only one of them is CI's.** `ci.yml` runs on every
+push and answers "did this commit break anything". Nothing in it answers "did
+the world move while nobody was looking" - an advisory published against a
+package nobody touched, a dependency quietly three majors behind, a schema that
+drifted from its migrations. Those rot on a calendar, so `health.yml` checks
+them on one, every Monday.
+
+It reports rather than fixes, and it reports into a single issue that is
+rewritten each week and closed the week it comes back clean. A new issue every
+Monday is a pile of stale duplicates, and an open issue reading "all clear" is
+the same noise more politely - either one teaches people to skip the label that
+matters.
+
+Patches alone never open it. They arrive constantly, `npm audit` speaks up when
+one of them matters, and a weekly notice nobody needs to act on is how somebody
+learns to skip the notice that does. Advisories are counted twice, once over
+everything and once with `--omit=dev`, because "eight advisories" and "one a
+stranger could reach" are different sentences deserving different Mondays.
+
+It also watches the two things that expire on a date rather than on a release.
+Runtime support windows - Node, Postgres, Next - are looked up against
+endoflife.date each week rather than written down, because a support date
+copied into a repo is wrong the first time upstream moves it and nobody
+re-reads a constant. A lookup that fails is reported as a failure and raises
+the alarm: not knowing and being fine are different answers, and a check that
+silently returns nothing every week is worse than no check because it looks
+like one.
+
+Credential ages are the opposite, and live in `lifecycle.json`, because no API
+can say when somebody last rotated a token. A date nobody has recorded is
+reported and never opens the issue on its own - that is a form to fill in, not
+a weekly alarm - while a rotation past its own interval does.
+
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
 integration surface — nothing after the hand-off is visible to this app.
