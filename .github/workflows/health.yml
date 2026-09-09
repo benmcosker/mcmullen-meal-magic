@@ -1,0 +1,135 @@
+name: Weekly health
+
+# CI runs on every push and answers "did this commit break anything". Nothing
+# there answers "did the world move while nobody was looking": an advisory
+# published against a dependency we did not touch, a package quietly three
+# majors behind, a schema that drifted from its migrations. Those rot on a
+# calendar rather than on a commit, so they are checked on one.
+on:
+  schedule:
+    # Mondays, 07:00 UTC. Early enough to be waiting on a Monday morning,
+    # late enough that a Sunday night npm publish is already in the registry.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+# Enough to file the report and no more. Nothing here writes to the repo.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+
+    services:
+      # The drift check compares the migrations against the schema, and needs
+      # a real database to apply them to.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mealmagic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mealmagic
+      BETTER_AUTH_SECRET: ci-only-secret
+      BETTER_AUTH_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Both of these exit non-zero when they have something to say, which is
+      # the normal case rather than a failure - the report is the output.
+      # Twice: everything, then only what ships. A dev-only advisory is worth
+      # knowing about and is not worth a Monday morning, and the difference is
+      # not reliably guessable from the tree.
+      - name: Collect advisories
+        run: |
+          npm audit --json > /tmp/audit.json || true
+          npm audit --omit=dev --json > /tmp/audit-prod.json || true
+
+      - name: Collect outdated packages
+        run: npm outdated --json > /tmp/outdated.json || true
+
+      # A migration that was never written shows up here rather than on the
+      # deploy that needed it.
+      - name: Check for schema drift
+        id: drift
+        run: |
+          npm run db:deploy
+          # Applies every migration to an empty database, then asks whether
+          # the result still matches the schema. --exit-code makes 0 mean
+          # "they agree" and 2 mean "a migration was never written".
+          npx prisma migrate diff \
+            --from-config-datasource \
+            --to-schema prisma/schema.prisma \
+            --exit-code > /tmp/drift.txt 2>&1 && drift=false || drift=true
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+          cat /tmp/drift.txt
+
+      - name: Write the report
+        id: report
+        run: node scripts/health-check.mjs
+        env:
+          DRIFT: ${{ steps.drift.outputs.drift }}
+
+      # One issue, reopened and rewritten each week rather than a new one each
+      # Monday - a pile of stale duplicates is how people learn to ignore a
+      # label. Closed automatically when there is nothing left to say, because
+      # an open issue reading "all clear" is the same noise more politely.
+      - name: File or close the report
+        uses: actions/github-script@v7
+        env:
+          NEEDED: ${{ steps.report.outputs.needed }}
+          BODY: ${{ steps.report.outputs.body }}
+        with:
+          script: |
+            const title = "Weekly health: dependencies and schema";
+            const label = "health";
+            const { owner, repo } = context.repo;
+
+            const existing = (await github.rest.issues.listForRepo({
+              owner, repo, state: "open", labels: label, per_page: 10,
+            })).data.find((i) => i.title === title);
+
+            if (process.env.NEEDED !== "true") {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: existing.number,
+                  body: "Clear this week. Closing; it will reopen if anything shows up.",
+                });
+                await github.rest.issues.update({
+                  owner, repo, issue_number: existing.number, state: "closed",
+                });
+              }
+              core.info("Nothing to report.");
+              return;
+            }
+
+            const body = process.env.BODY;
+            if (existing) {
+              await github.rest.issues.update({
+                owner, repo, issue_number: existing.number, body,
+              });
+              core.info(`Updated #${existing.number}`);
+            } else {
+              const made = await github.rest.issues.create({
+                owner, repo, title, body, labels: [label],
+              });
+              core.info(`Opened #${made.data.number}`);
+            }
