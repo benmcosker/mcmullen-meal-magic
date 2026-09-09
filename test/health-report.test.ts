@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   bump,
   buildReport,
+  daysUntil,
   needsAttention,
   summariseAudit,
+  summariseCredentials,
   summariseOutdated,
+  summariseRuntimes,
   // Plain JS, so the workflow can run it straight after npm ci.
 } from "../scripts/health-report.mjs";
 
@@ -171,5 +174,124 @@ describe("buildReport", () => {
       outdated: summariseOutdated({}),
     };
     expect(buildReport(empty)).toContain("_None._");
+  });
+});
+
+const TODAY = new Date("2026-09-09T00:00:00.000Z");
+
+describe("daysUntil", () => {
+  it("counts forward and back", () => {
+    expect(daysUntil("2026-09-19", TODAY)).toBe(10);
+    expect(daysUntil("2026-08-30", TODAY)).toBe(-10);
+  });
+});
+
+describe("summariseRuntimes", () => {
+  const runtimes = [{ product: "nodejs", cycle: "22", used: "Vercel" }];
+
+  it("says how long is left when the end is in sight", () => {
+    const [only] = summariseRuntimes(
+      runtimes,
+      { "nodejs/22": { eol: "2026-11-08" } },
+      TODAY,
+      180,
+    );
+    expect(only.state).toBe("soon");
+    expect(only.days).toBe(60);
+  });
+
+  it("says when support has already ended", () => {
+    const [only] = summariseRuntimes(
+      runtimes,
+      { "nodejs/22": { eol: "2026-01-01" } },
+      TODAY,
+      180,
+    );
+    expect(only.state).toBe("ended");
+  });
+
+  it("is quiet about a date comfortably far off", () => {
+    const [only] = summariseRuntimes(
+      runtimes,
+      { "nodejs/22": { eol: "2028-04-30" } },
+      TODAY,
+      180,
+    );
+    expect(only.state).toBe("supported");
+  });
+
+  it("handles a cycle with no announced end", () => {
+    // endoflife.date answers `false` rather than a date for these.
+    const [only] = summariseRuntimes(
+      runtimes,
+      { "nodejs/22": { eol: false } },
+      TODAY,
+      180,
+    );
+    expect(only.state).toBe("supported");
+    expect(only.eol).toBeNull();
+  });
+
+  /*
+   * The important one. A lookup that fails must not read as "fine" - a check
+   * that silently answers nothing every week is worse than no check, because
+   * it looks like one.
+   */
+  it("says it could not check, rather than nothing", () => {
+    const [only] = summariseRuntimes(runtimes, {}, TODAY, 180);
+    expect(only.state).toBe("unknown");
+    expect(
+      needsAttention({
+        audit: { reportable: [], production: [], total: 0 },
+        outdated: { major: [], minor: [], patch: [] },
+        drift: false,
+        runtimes: [only],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("summariseCredentials", () => {
+  it("ages a recorded rotation", () => {
+    const [only] = summariseCredentials(
+      [{ name: "T", rotatedOn: "2026-08-10", everyDays: 365 }],
+      TODAY,
+    );
+    expect(only.age).toBe(30);
+    expect(only.state).toBe("current");
+  });
+
+  it("calls it overdue past its own interval", () => {
+    const [only] = summariseCredentials(
+      [{ name: "T", rotatedOn: "2025-01-01", everyDays: 365 }],
+      TODAY,
+    );
+    expect(only.state).toBe("overdue");
+  });
+
+  /*
+   * A missing date is reported and never raises the alarm. A weekly notice
+   * about a form nobody has filled in is how somebody learns to skip the
+   * notice that matters; an overdue rotation is a fact about the world and
+   * does raise it.
+   */
+  it("reports a missing date without opening an issue for it", () => {
+    const clear = {
+      audit: { reportable: [], production: [], total: 0 },
+      outdated: { major: [], minor: [], patch: [] },
+      drift: false,
+    };
+    const unrecorded = summariseCredentials(
+      [{ name: "T", rotatedOn: null, everyDays: 365 }],
+      TODAY,
+    );
+    expect(unrecorded[0].state).toBe("unrecorded");
+    expect(needsAttention({ ...clear, credentials: unrecorded })).toBe(false);
+
+    const overdue = summariseCredentials(
+      [{ name: "T", rotatedOn: "2020-01-01", everyDays: 365 }],
+      TODAY,
+    );
+    expect(needsAttention({ ...clear, credentials: overdue })).toBe(true);
   });
 });

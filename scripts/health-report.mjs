@@ -86,13 +86,91 @@ export function summariseOutdated(outdated) {
   };
 }
 
-/** Is there anything here a person should act on? */
-export function needsAttention({ audit, outdated, drift }) {
+/** Whole days from `from` to `to`, negative once `to` is in the past. */
+export function daysUntil(to, from) {
+  const day = 24 * 60 * 60 * 1000;
+  return Math.round((new Date(to).getTime() - new Date(from).getTime()) / day);
+}
+
+/**
+ * How long each runtime has left.
+ *
+ * The dates are fetched rather than written down: a support date copied into a
+ * repo is wrong the first time upstream moves it, and nobody re-reads a
+ * constant. A lookup that failed is reported as a failure rather than as
+ * "fine" - not knowing and being safe are different, and only one of them is
+ * worth silence.
+ */
+export function summariseRuntimes(runtimes, eol, today, warnWithinDays) {
+  return runtimes.map((r) => {
+    const found = eol?.[`${r.product}/${r.cycle}`];
+
+    if (found === undefined) {
+      return { ...r, state: "unknown" };
+    }
+    // endoflife.date answers `false` for a cycle with no announced end.
+    if (!found.eol) {
+      return { ...r, state: "supported", eol: null };
+    }
+
+    const days = daysUntil(found.eol, today);
+    return {
+      ...r,
+      eol: found.eol,
+      days,
+      state: days < 0 ? "ended" : days <= warnWithinDays ? "soon" : "supported",
+    };
+  });
+}
+
+/**
+ * How old each secret is.
+ *
+ * "never recorded" is a real answer and is reported, but it does not raise the
+ * alarm on its own: a weekly notice about a form nobody has filled in is how
+ * somebody learns to skip the notice that matters. An overdue rotation does
+ * raise it, because that is a fact about the world rather than about the file.
+ */
+export function summariseCredentials(credentials, today) {
+  return credentials.map((c) => {
+    if (!c.rotatedOn) return { ...c, state: "unrecorded" };
+
+    const age = -daysUntil(c.rotatedOn, today);
+    return {
+      ...c,
+      age,
+      state: age > c.everyDays ? "overdue" : "current",
+    };
+  });
+}
+
+/**
+ * Is there anything here a person should act on?
+ *
+ * @param {{
+ *   audit: { reportable: unknown[], [k: string]: unknown },
+ *   outdated: { major: unknown[], minor: unknown[], [k: string]: unknown },
+ *   drift: boolean,
+ *   runtimes?: { state: string }[],
+ *   credentials?: { state: string }[],
+ * }} report
+ */
+export function needsAttention({
+  audit,
+  outdated,
+  drift,
+  runtimes = [],
+  credentials = [],
+}) {
   return (
     drift ||
     audit.reportable.length > 0 ||
     outdated.major.length > 0 ||
-    outdated.minor.length > 0
+    outdated.minor.length > 0 ||
+    // A runtime we could not look up counts: not knowing is not the same as
+    // being fine, and a lookup that quietly fails every week is worthless.
+    runtimes.some((r) => ["ended", "soon", "unknown"].includes(r.state)) ||
+    credentials.some((c) => c.state === "overdue")
   );
 }
 
@@ -106,7 +184,41 @@ const list = (rows, render) =>
  * this app all week: what changed, what it would cost to fix, and what can be
  * ignored until next time.
  */
-export function buildReport({ audit, outdated, drift, versions, date }) {
+export function buildReport({
+  audit,
+  outdated,
+  drift,
+  versions,
+  date,
+  runtimes = [],
+  credentials = [],
+}) {
+  const runtimeLines = list(runtimes, (r) => {
+    const what = `**${r.product} ${r.cycle}** (${r.used})`;
+    if (r.state === "unknown") {
+      return `- ${what} - **could not look this up**. endoflife.date did not answer, so this week says nothing about it either way.`;
+    }
+    if (r.state === "ended") {
+      return `- ${what} - **out of support since ${r.eol}**, ${-r.days} days ago.`;
+    }
+    if (r.state === "soon") {
+      return `- ${what} - support ends ${r.eol}, in ${r.days} days.`;
+    }
+    return `- ${what} - supported${r.eol ? ` until ${r.eol}` : ", no end announced"}.`;
+  });
+
+  const credentialLines = list(credentials, (c) => {
+    const what = `**${c.name}** (${c.where})`;
+    const note = c.note ? ` ${c.note}` : "";
+    if (c.state === "unrecorded") {
+      return `- ${what} - no rotation date recorded.${note}`;
+    }
+    if (c.state === "overdue") {
+      return `- ${what} - **${c.age} days old**, past the ${c.everyDays}-day mark.${note}`;
+    }
+    return `- ${what} - ${c.age} days old.${note}`;
+  });
+
   const advisories = list(
     audit.reportable,
     (a) =>
@@ -152,6 +264,18 @@ ${minors}
 ## Schema
 
 ${drift ? "**Drift**: `prisma/schema.prisma` and the migrations disagree. A migration is missing." : "Migrations match the schema."}
+
+## Runtimes
+
+${runtimeLines}
+
+## Credentials
+
+${credentialLines}
+
+<sub>Rotation dates are kept by hand in \`lifecycle.json\` - no API can say when
+somebody last rotated a token. A missing date is reported but never opens this
+issue on its own.</sub>
 
 ## Versions
 

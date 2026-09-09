@@ -1,0 +1,63 @@
+{
+  "$comment": [
+    "What the weekly health check watches that no package manager knows about.",
+    "",
+    "Runtimes are looked up against endoflife.date at run time rather than",
+    "written down here, because a support date copied into a repo is wrong the",
+    "first time it moves and nobody notices. Only which cycle we are on is",
+    "recorded; the date it dies is asked for each week.",
+    "",
+    "Credential dates are the opposite: no API can tell us when somebody last",
+    "rotated a token, so it is written down by hand. A null date means nobody",
+    "has recorded one - which is reported but never opens an issue on its own,",
+    "since a weekly alarm about a form nobody filled in is how people learn to",
+    "skip the alarm that matters."
+  ],
+
+  "runtimes": [
+    { "product": "nodejs", "cycle": "22", "used": ".github/workflows, Vercel" },
+    {
+      "product": "postgresql",
+      "cycle": "16",
+      "used": "Neon, and CI's service"
+    },
+    { "product": "nextjs", "cycle": "16", "used": "the app itself" }
+  ],
+
+  "warnWithinDays": 180,
+
+  "credentials": [
+    {
+      "name": "BLOB_READ_WRITE_TOKEN",
+      "where": "Vercel → Storage → Blob",
+      "rotatedOn": null,
+      "everyDays": 365,
+      "note": "Two of these were pasted into a chat transcript and should be treated as burned. Rotate and record the date."
+    },
+    {
+      "name": "TWILIO_AUTH_TOKEN",
+      "where": "Twilio console → Account → API keys & tokens",
+      "rotatedOn": null,
+      "everyDays": 365
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "where": "console.anthropic.com → API keys",
+      "rotatedOn": null,
+      "everyDays": 365
+    },
+    {
+      "name": "BETTER_AUTH_SECRET",
+      "where": "Vercel → Settings → Environment Variables",
+      "rotatedOn": null,
+      "everyDays": 730,
+      "note": "Rotating this signs everybody out. Worth doing rarely and deliberately."
+    },
+    {
+      "name": "DATABASE_URL",
+      "where": "Neon → Roles → reset password",
+      "rotatedOn": null,
+      "everyDays": 730
+    }
+  ]
+}

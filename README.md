@@ -371,6 +371,20 @@ learns to skip the notice that does. Advisories are counted twice, once over
 everything and once with `--omit=dev`, because "eight advisories" and "one a
 stranger could reach" are different sentences deserving different Mondays.
 
+It also watches the two things that expire on a date rather than on a release.
+Runtime support windows - Node, Postgres, Next - are looked up against
+endoflife.date each week rather than written down, because a support date
+copied into a repo is wrong the first time upstream moves it and nobody
+re-reads a constant. A lookup that fails is reported as a failure and raises
+the alarm: not knowing and being fine are different answers, and a check that
+silently returns nothing every week is worse than no check because it looks
+like one.
+
+Credential ages are the opposite, and live in `lifecycle.json`, because no API
+can say when somebody last rotated a token. A date nobody has recorded is
+reported and never opens the issue on its own - that is a form to fill in, not
+a weekly alarm - while a rotation past its own interval does.
+
 **Instacart does not place orders.** Both of its endpoints return a URL to a
 prepared page; the customer checks out on Instacart. That is the entire
 integration surface — nothing after the hand-off is visible to this app.
