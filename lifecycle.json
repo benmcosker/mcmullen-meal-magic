@@ -81,7 +81,8 @@
       "where": "Twilio console → Account → API keys & tokens",
       "rotatedOn": null,
       "dueMonth": "October",
-      "everyDays": 365
+      "everyDays": 365,
+      "note": "The account auth token, used as the password on every outbound call to api.twilio.com. Nothing inbound is signed with it - this app has no Twilio webhook - so a rotation cannot break a path nobody can see. Rotate with the secondary token rather than by replacing the primary: in the console under Account, Keys & Credentials, Auth tokens, request a secondary token. Twilio holds both as valid, which is what makes this zero-downtime. Set the secondary as TWILIO_AUTH_TOKEN in Vercel, on Production and on Preview if it is set there, then redeploy - a running deployment keeps the environment it started with, so saving the variable on its own reaches nothing. Verify by texting yourself the week's shopping list from /plan, which is the only code path that calls Twilio and so is a complete test. Then promote the secondary to primary in the console: that is the step that invalidates the old token, and until it is done nothing has actually been rotated. The account token is all-or-nothing. If revocable credentials are wanted, Twilio API keys (SK...) can be created and killed independently, but that is a change to twilio.ts rather than a rotation."
     },
     {
       "name": "RESEND_API_KEY",

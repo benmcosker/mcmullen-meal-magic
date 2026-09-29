@@ -5,7 +5,6 @@ import { HouseholdManager } from "@/components/HouseholdManager";
 import { getHousehold, MAX_HOUSEHOLD_NAME } from "@/lib/household";
 import { INVITE_TTL_DAYS, listPendingInvites } from "@/lib/invites";
 import { requireHousehold } from "@/lib/session";
-import { smsAvailable } from "@/lib/sms";
 
 export default async function HouseholdPage() {
   const user = await requireHousehold();
@@ -52,7 +51,6 @@ export default async function HouseholdPage() {
           household?.members.find((m) => m.id === user.id)?.smsConsented ??
           false
         }
-        smsConfigured={smsAvailable()}
       />
     </AppShell>
   );

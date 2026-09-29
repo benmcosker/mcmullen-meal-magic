@@ -75,7 +75,6 @@ export function HouseholdManager({
   maxNameLength,
   myPhone,
   myConsent,
-  smsConfigured,
 }: {
   householdName: string;
   /** How many this household cooks for, or null when nobody has said. */
@@ -86,7 +85,6 @@ export function HouseholdManager({
   maxNameLength: number;
   myPhone: string | null;
   myConsent: boolean;
-  smsConfigured: boolean;
 }) {
   return (
     <Stack spacing={3}>
@@ -95,11 +93,7 @@ export function HouseholdManager({
         maxLength={maxNameLength}
         defaultServings={defaultServings}
       />
-      <MyPhone
-        current={myPhone}
-        consented={myConsent}
-        smsConfigured={smsConfigured}
-      />
+      <MyPhone current={myPhone} consented={myConsent} />
       <Members members={members} householdName={householdName} />
       <InviteForm inviteDays={inviteDays} maxNameLength={maxNameLength} />
       {invites.length > 0 ? <PendingInvites invites={invites} /> : null}
@@ -267,11 +261,9 @@ function ServingDefault({
 function MyPhone({
   current,
   consented,
-  smsConfigured,
 }: {
   current: string | null;
   consented: boolean;
-  smsConfigured: boolean;
 }) {
   const [draft, setDraft] = useState(current ? formatPhone(current) : "");
   // Seeded from what is stored rather than from whether a number exists: the
@@ -312,9 +304,7 @@ function MyPhone({
           Your phone
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 2 }}>
-          {smsConfigured
-            ? "Used to text you the week's shopping list. Clear it to stop."
-            : "Texting is not set up on this deployment yet, so a number here does nothing for now."}
+          Used to text you the week&rsquo;s shopping list. Clear it to stop.
         </Typography>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
