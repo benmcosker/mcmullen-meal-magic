@@ -43,6 +43,7 @@ export function RecipeHero({ recipe }: { recipe: RecipeWithRelations }) {
     // typechecks, builds, and then fails at render.
     <Link
       href={recipePath(recipe)}
+      transitionTypes={["nav-forward"]}
       style={{ textDecoration: "none", color: "inherit", display: "block" }}
     >
       <Box

@@ -11,6 +11,7 @@ import { RecipeHero } from "@/components/RecipeHero";
 import { RecipePagination } from "@/components/RecipePagination";
 import { RecipeSearchBar } from "@/components/RecipeSearchBar";
 import { PaperNote } from "@/components/PaperNote";
+import { PageTransition } from "@/components/PageTransition";
 import { pickCollections } from "@/lib/collections";
 import { withArticle } from "@/lib/household";
 import { listTagsWithCounts } from "@/lib/recipe-mutations";
@@ -117,114 +118,116 @@ export default async function RecipesPage({
 
   return (
     <AppShell>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: { xs: "stretch", md: "flex-end" },
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          // On a phone the title and the controls stack, and a 32px gap
-          // between them was buying nothing but scrolling: the whole header
-          // ran to 500px on an 852px screen before a single dish appeared.
-          gap: { xs: 1.5, md: 4 },
-          mb: { xs: "20px", md: "36px" },
-        }}
-      >
-        <Box>
-          <Typography
-            variant="overline"
-            component="p"
-            sx={{ color: "secondary.main", mb: "12px" }}
-          >
-            {/*
-             * The viewer's household, even though the library is shared by all
-             * of them: it is the box they keep it in, and "the shared recipe
-             * box" belongs to nobody.
-             */}
-            {withArticle(householdName)} recipe box · {libraryCount}{" "}
-            {libraryCount === 1 ? "dish" : "dishes"}
-          </Typography>
-          <Typography variant="h1">Recipes</Typography>
-        </Box>
-
-        <Stack
-          direction="row"
+      <PageTransition>
+        <Box
           sx={{
-            alignItems: "center",
-            // Filters and New recipe share the row width on a phone rather
-            // than huddling at the left with a hole beside them.
-            justifyContent: { xs: "space-between", md: "flex-start" },
-            width: { xs: "100%", md: "auto" },
-            gap: "18px",
-            pb: { xs: 0, md: "8px" },
+            display: "flex",
+            alignItems: { xs: "stretch", md: "flex-end" },
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            // On a phone the title and the controls stack, and a 32px gap
+            // between them was buying nothing but scrolling: the whole header
+            // ran to 500px on an 852px screen before a single dish appeared.
+            gap: { xs: 1.5, md: 4 },
+            mb: { xs: "20px", md: "36px" },
           }}
         >
-          <RecipeFilters tags={tags} />
-          <LinkButton href="/recipes/new" variant="contained" color="ink">
-            New recipe
-          </LinkButton>
-        </Stack>
-      </Box>
-
-      <RecipeSearchBar />
-
-      <CollectionsRow collections={pickCollections(tags)} />
-
-      {/*
-       * Not a 404: the recipes exist and the visitor did nothing wrong. Not a
-       * redirect either - that would rewrite history and break the back
-       * button. They get the last page and an explanation.
-       */}
-      {pastTheEnd ? (
-        <Box sx={{ mb: "36px" }}>
-          <PaperNote label="That page is gone">{pastTheEndNote}</PaperNote>
-        </Box>
-      ) : null}
-
-      {recipes.length === 0 ? (
-        <Typography variant="body1" sx={{ color: "text.muted" }}>
-          {query || tagSlugs.length > 0
-            ? "Nothing matches that search."
-            : "No recipes yet. Add one, or upload a PDF."}
-        </Typography>
-      ) : (
-        <>
-          {hero ? <RecipeHero recipe={hero} /> : null}
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, 1fr)",
-                md: "repeat(3, 1fr)",
-              },
-              // 44px between rows against 40px between columns: the extra
-              // height stops a title reading as the caption of the photo below.
-              gap: "44px 40px",
-              pt: hero ? "44px" : 0,
-            }}
-          >
-            {grid.map((recipe, index) => (
-              <RecipeGridCard
-                key={recipe.id}
-                recipe={recipe}
-                // With no hero, the first row is the fold rather than below
-                // it. Three cards, not the twenty-one under them.
-                priority={!hero && index < 3}
-              />
-            ))}
+          <Box>
+            <Typography
+              variant="overline"
+              component="p"
+              sx={{ color: "secondary.main", mb: "12px" }}
+            >
+              {/*
+               * The viewer's household, even though the library is shared by all
+               * of them: it is the box they keep it in, and "the shared recipe
+               * box" belongs to nobody.
+               */}
+              {withArticle(householdName)} recipe box · {libraryCount}{" "}
+              {libraryCount === 1 ? "dish" : "dishes"}
+            </Typography>
+            <Typography variant="h1">Recipes</Typography>
           </Box>
 
-          <RecipePagination
-            current={page}
-            totalPages={totalPages}
-            totalResults={matchCount}
-            params={carried.toString()}
-            summary={summary}
-          />
-        </>
-      )}
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "center",
+              // Filters and New recipe share the row width on a phone rather
+              // than huddling at the left with a hole beside them.
+              justifyContent: { xs: "space-between", md: "flex-start" },
+              width: { xs: "100%", md: "auto" },
+              gap: "18px",
+              pb: { xs: 0, md: "8px" },
+            }}
+          >
+            <RecipeFilters tags={tags} />
+            <LinkButton href="/recipes/new" variant="contained" color="ink">
+              New recipe
+            </LinkButton>
+          </Stack>
+        </Box>
+
+        <RecipeSearchBar />
+
+        <CollectionsRow collections={pickCollections(tags)} />
+
+        {/*
+         * Not a 404: the recipes exist and the visitor did nothing wrong. Not a
+         * redirect either - that would rewrite history and break the back
+         * button. They get the last page and an explanation.
+         */}
+        {pastTheEnd ? (
+          <Box sx={{ mb: "36px" }}>
+            <PaperNote label="That page is gone">{pastTheEndNote}</PaperNote>
+          </Box>
+        ) : null}
+
+        {recipes.length === 0 ? (
+          <Typography variant="body1" sx={{ color: "text.muted" }}>
+            {query || tagSlugs.length > 0
+              ? "Nothing matches that search."
+              : "No recipes yet. Add one, or upload a PDF."}
+          </Typography>
+        ) : (
+          <>
+            {hero ? <RecipeHero recipe={hero} /> : null}
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, 1fr)",
+                  md: "repeat(3, 1fr)",
+                },
+                // 44px between rows against 40px between columns: the extra
+                // height stops a title reading as the caption of the photo below.
+                gap: "44px 40px",
+                pt: hero ? "44px" : 0,
+              }}
+            >
+              {grid.map((recipe, index) => (
+                <RecipeGridCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  // With no hero, the first row is the fold rather than below
+                  // it. Three cards, not the twenty-one under them.
+                  priority={!hero && index < 3}
+                />
+              ))}
+            </Box>
+
+            <RecipePagination
+              current={page}
+              totalPages={totalPages}
+              totalResults={matchCount}
+              params={carried.toString()}
+              summary={summary}
+            />
+          </>
+        )}
+      </PageTransition>
     </AppShell>
   );
 }

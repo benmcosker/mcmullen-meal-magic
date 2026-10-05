@@ -402,6 +402,49 @@ const identity: ThemeOptions = {
         "@keyframes photo-morph": { "30%": { filter: "blur(3px)" } },
 
         /*
+         * Which way the page went.
+         *
+         * Leftward is onward and rightward is back, the one piece of motion
+         * grammar nobody has to be taught. `PageTransition` maps the link's
+         * declared direction onto these classes; an untagged navigation gets
+         * none of them and moves nothing.
+         *
+         * 16px, not the 60px the pattern is usually drawn with. This design is
+         * type on paper and a page that slides a third of its width reads as a
+         * carousel; at this distance the movement is felt rather than watched,
+         * and the opacity does most of the work. 220ms for the same reason -
+         * fast enough that it never stands between a cook and the method.
+         */
+        "::view-transition-group(.nav-forward), ::view-transition-group(.nav-back)":
+          {
+            animationDuration: "220ms",
+          },
+        "::view-transition-old(.nav-forward)": {
+          animationName: "nav-leave-left",
+        },
+        "::view-transition-new(.nav-forward)": {
+          animationName: "nav-enter-right",
+        },
+        "::view-transition-old(.nav-back)": {
+          animationName: "nav-leave-right",
+        },
+        "::view-transition-new(.nav-back)": {
+          animationName: "nav-enter-left",
+        },
+        "@keyframes nav-leave-left": {
+          to: { opacity: 0, transform: "translateX(-16px)" },
+        },
+        "@keyframes nav-enter-right": {
+          from: { opacity: 0, transform: "translateX(16px)" },
+        },
+        "@keyframes nav-leave-right": {
+          to: { opacity: 0, transform: "translateX(16px)" },
+        },
+        "@keyframes nav-enter-left": {
+          from: { opacity: 0, transform: "translateX(-16px)" },
+        },
+
+        /*
          * The transition overlay swallows clicks for as long as it runs. On a
          * grid of 24 photographs that is a click lost to an animation nobody
          * asked to wait for.
