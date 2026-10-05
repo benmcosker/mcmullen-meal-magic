@@ -95,6 +95,10 @@ export function RecipeGridCard({
      */
     <Link
       href={recipePath(recipe)}
+      // Declares the direction for `PageTransition`. Untagged links move no
+      // page at all, so this is opt-in rather than something every anchor in
+      // the app inherits.
+      transitionTypes={["nav-forward"]}
       style={{ textDecoration: "none", color: "inherit", display: "contents" }}
     >
       <Box
