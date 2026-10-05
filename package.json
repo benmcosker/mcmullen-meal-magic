@@ -34,7 +34,7 @@
     "@vercel/blob": "^2.8.0",
     "better-auth": "^1.7.1",
     "heic-to": "^1.5.2",
-    "next": "16.3.5",
+    "next": "16.3.8",
     "pdf-lib": "^1.17.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
