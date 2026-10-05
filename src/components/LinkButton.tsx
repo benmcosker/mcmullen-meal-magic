@@ -15,27 +15,10 @@ import type { ReactNode } from "react";
 export function LinkButton({
   href,
   children,
-  transitionTypes,
   ...buttonProps
-}: {
-  href: string;
-  children: ReactNode;
-  /**
-   * Which direction this navigation counts as, for `PageTransition`.
-   *
-   * Passed through to the `Link` underneath rather than to the Button: MUI
-   * forwards what it does not recognise to the component it was given, but
-   * naming it here keeps it out of `ButtonProps` and off the DOM node.
-   */
-  transitionTypes?: string[];
-} & Omit<ButtonProps, "href">) {
+}: { href: string; children: ReactNode } & Omit<ButtonProps, "href">) {
   return (
-    <Button
-      component={Link}
-      href={href}
-      transitionTypes={transitionTypes}
-      {...buttonProps}
-    >
+    <Button component={Link} href={href} {...buttonProps}>
       {children}
     </Button>
   );

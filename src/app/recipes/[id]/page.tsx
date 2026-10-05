@@ -97,27 +97,6 @@ export default async function RecipePage({
   return (
     <AppShell>
       <PageTransition>
-        {/*
-         * The way back, and the only link in the app tagged `nav-back`.
-         *
-         * The header already has a Recipes item, so this is a second way to
-         * the same place - but the header is navigation and this is the exit
-         * from the thing you are reading, which is a different question. It
-         * is also what declares the direction: without a link saying so, a
-         * return to the library is an untagged navigation and moves nothing.
-         *
-         * Matches the one on the cooking view, which has sat above the title
-         * for the same reason since it was built.
-         */}
-        <LinkButton
-          href="/recipes"
-          size="small"
-          transitionTypes={["nav-back"]}
-          sx={{ ml: -1, mb: 0.5 }}
-        >
-          ← Recipes
-        </LinkButton>
-
         <Stack
           direction={{ xs: "column", sm: "row" }}
           sx={{

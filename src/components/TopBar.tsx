@@ -196,11 +196,23 @@ export function TopBar({
             {items.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
+              /*
+               * Going up out of a section is going back, and the page slides
+               * rightward to say so - see `PageTransition`.
+               *
+               * Only up, though. `/recipes/<id>` to `/recipes` is a return;
+               * `/plan` to `/recipes` is a sideways move between sections,
+               * and animating that as a retreat would be a lie about where
+               * you have been. The same `startsWith` that decides which item
+               * is lit decides this, one character apart.
+               */
+              const leaving = pathname.startsWith(`${item.href}/`);
               return (
                 <Box
                   key={item.href}
                   component={Link}
                   href={item.href}
+                  transitionTypes={leaving ? ["nav-back"] : undefined}
                   aria-current={active ? "page" : undefined}
                   sx={{
                     display: "inline-flex",
